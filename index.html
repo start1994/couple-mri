@@ -1,0 +1,2209 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>We+ 커플 MRI</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{
+  --navy:#1A2F4E;--navy2:#2C3E50;--navy3:#34495E;
+  --col-p:#D35400;--col-h:#8E44AD;--col-b:#2471A3;--col-s:#1A7A6E;
+  --green:#4A7C3F;--green2:#27AE60;--yellow:#E67E22;--red:#E74C3C;
+  --bg:#F5F7FA;--border:#EAEEF4;--muted:#7F8C8D;--text:#2C3E50;
+}
+body{background:#DDE4EF;display:flex;justify-content:center;align-items:center;min-height:100vh;
+  min-height:-webkit-fill-available;
+  font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif;}
+html{height:-webkit-fill-available;}
+.phone{position:relative;width:390px;height:844px;background:var(--bg);border-radius:40px;
+  overflow:hidden;
+  box-shadow:0 30px 80px rgba(0,0,0,.45),0 0 0 10px var(--navy),0 0 0 11px rgba(255,255,255,.1);}
+@media(max-width:440px){body{align-items:flex-start;background:var(--bg);}
+  .phone{width:100vw;width:100dvw;height:100vh;height:100dvh;
+    height:-webkit-fill-available;border-radius:0;box-shadow:none;
+    padding-bottom:env(safe-area-inset-bottom);}}
+/* scr = 각 화면 (position:absolute, 개별 overflow) */
+.scr{position:absolute;top:0;left:0;right:0;bottom:0;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;display:none;background:var(--bg);}
+.scr.on{display:block;}
+/* 랜딩/로딩/대기처럼 flex centering이 필요한 화면 */
+#s-land.on,#s-proc1.on,#s-proc2.on,#s-wait.on{
+  display:flex;flex-direction:column;justify-content:center;align-items:center;}
+/* 설문/초대처럼 상단고정+스크롤바디 구조 */
+#s-st.on,#s-sv.on,#s-invite.on{display:flex;flex-direction:column;}
+
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:#ccc;border-radius:2px;}
+
+/* ── 버튼 ── */
+.btn{border:none;border-radius:14px;padding:14px 20px;font-size:15px;font-weight:700;
+  cursor:pointer;width:100%;letter-spacing:-.3px;transition:.15s;
+  touch-action:manipulation;-webkit-appearance:none;appearance:none;}
+.btn:active{transform:scale(.97);}
+.btn-primary{background:linear-gradient(135deg,var(--navy),#4A235A);color:#fff;
+  box-shadow:0 4px 16px rgba(26,47,78,.3);}
+.btn-green{background:linear-gradient(135deg,var(--green),#1E8449);color:#fff;
+  box-shadow:0 4px 16px rgba(74,124,63,.35);}
+.btn-ghost{background:transparent;color:var(--navy);border:2px solid var(--navy);font-size:14px;}
+.btn-sm{padding:10px 16px;font-size:13px;font-weight:700;}
+
+/* ══ 랜딩 ══ */
+#s-land{background:linear-gradient(160deg,var(--navy),#4A235A 60%,#1A7A6E);color:#fff;
+  text-align:center;padding:36px 24px;}
+.land-logo{font-size:52px;margin-bottom:10px;}
+.land-title{font-size:30px;font-weight:900;letter-spacing:-1px;margin-bottom:6px;}
+.land-sub{font-size:13px;color:rgba(255,255,255,.65);line-height:1.65;margin-bottom:28px;}
+.land-chips{display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-bottom:28px;}
+.chip{background:rgba(255,255,255,.13);border-radius:20px;padding:5px 12px;
+  font-size:11px;color:rgba(255,255,255,.85);font-weight:600;}
+.land-steps{background:rgba(255,255,255,.09);border-radius:18px;padding:18px;
+  margin-bottom:28px;text-align:left;width:100%;}
+.land-steps h4{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:10px;
+  text-transform:uppercase;letter-spacing:.5px;}
+.srow{display:flex;align-items:center;gap:9px;margin-bottom:9px;
+  font-size:12px;color:rgba(255,255,255,.8);}
+.srow:last-child{margin-bottom:0;}
+.snum{background:linear-gradient(135deg,var(--col-p),var(--col-h));border-radius:50%;
+  width:20px;height:20px;display:flex;align-items:center;justify-content:center;
+  font-size:9px;font-weight:900;flex-shrink:0;}
+
+/* ══ 설문 공통 ══ */
+.sv-top{padding:16px 18px 10px;background:#fff;border-bottom:1px solid var(--border);
+  flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.06);position:sticky;top:0;z-index:10;}
+.sv-title{font-size:13px;color:var(--navy);font-weight:800;margin-bottom:7px;}
+.prog-wrap{background:#eaeffa;border-radius:6px;height:5px;overflow:hidden;}
+.prog{height:100%;background:linear-gradient(90deg,var(--col-p),var(--col-h));
+  border-radius:6px;transition:width .35s;}
+.prog-txt{font-size:10px;color:var(--muted);margin-top:3px;text-align:right;}
+.sv-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;
+  padding-bottom:calc(16px + env(safe-area-inset-bottom));}
+
+/* ── 기질 Likert 카드 ── */
+.q-card{background:#fff;border-radius:18px;padding:20px;
+  box-shadow:0 2px 10px rgba(26,47,78,.08);}
+.q-num{font-size:10px;font-weight:800;margin-bottom:6px;text-transform:uppercase;}
+.q-axis-tag{display:inline-block;border-radius:7px;padding:3px 9px;
+  font-size:10px;font-weight:800;margin-bottom:14px;}
+.q-text{font-size:15px;font-weight:700;color:var(--text);line-height:1.55;margin-bottom:18px;}
+.likert{display:flex;gap:6px;margin-bottom:8px;}
+.lk-btn{flex:1;background:var(--bg);border:2px solid var(--border);border-radius:11px;
+  padding:12px 2px;font-size:15px;font-weight:700;cursor:pointer;color:#aaa;
+  transition:.12s;text-align:center;line-height:1;}
+.lk-btn.on{color:#fff;}
+.lk-labels{display:flex;justify-content:space-between;font-size:9px;color:#bbb;padding:0 2px;}
+.lk-p.on{background:var(--col-p);border-color:var(--col-p);}
+.lk-h.on{background:var(--col-h);border-color:var(--col-h);}
+.lk-b.on{background:var(--col-b);border-color:var(--col-b);}
+.lk-s.on{background:var(--col-s);border-color:var(--col-s);}
+
+/* ── 가치관 다지선다 카드 ── */
+.vq-card{background:#fff;border-radius:18px;padding:20px;
+  box-shadow:0 2px 10px rgba(26,47,78,.08);}
+.vq-domain{display:inline-block;border-radius:7px;padding:3px 10px;
+  font-size:10px;font-weight:800;margin-bottom:10px;}
+.vq-text{font-size:15px;font-weight:700;color:var(--text);line-height:1.55;margin-bottom:16px;}
+.vq-opts{display:flex;flex-direction:column;gap:8px;}
+.vq-opt{background:var(--bg);border:2px solid var(--border);border-radius:13px;
+  padding:12px 14px;cursor:pointer;transition:.12s;
+  display:flex;align-items:flex-start;gap:9px;}
+.vq-opt.on{border-color:var(--navy);background:#EBF0F8;}
+.vq-badge{font-size:10px;font-weight:900;color:#fff;background:var(--muted);
+  border-radius:5px;padding:2px 6px;flex-shrink:0;margin-top:2px;transition:.12s;}
+.vq-opt.on .vq-badge{background:var(--navy);}
+.vq-opt-text{font-size:13px;color:var(--text);line-height:1.45;}
+.vq-opt.on .vq-opt-text{font-weight:700;color:var(--navy);}
+
+/* ══ 로딩 ══ */
+#s-proc1,#s-proc2{background:linear-gradient(160deg,var(--navy),#4A235A);color:#fff;
+  text-align:center;padding:36px 24px;}
+.load-icon{font-size:56px;margin-bottom:20px;animation:spin 2s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.load-title{font-size:21px;font-weight:800;margin-bottom:8px;}
+.load-sub{font-size:13px;color:rgba(255,255,255,.6);line-height:1.65;margin-bottom:26px;}
+.load-items{background:rgba(255,255,255,.09);border-radius:14px;padding:16px;text-align:left;width:100%;}
+.load-item{display:flex;align-items:center;gap:9px;margin-bottom:9px;
+  font-size:12px;color:rgba(255,255,255,.75);}
+.load-item:last-child{margin-bottom:0;}
+.ld{width:7px;height:7px;border-radius:50%;animation:blink 1.5s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:.3;transform:scale(1);}50%{opacity:1;transform:scale(1.35);}}
+
+/* ══════════════════════════════════════
+   개인 MRI 결과 화면 (v2)
+══════════════════════════════════════ */
+#s-rp{background:var(--bg);}
+/* sticky topbar */
+.rp-top-bar{display:flex;align-items:center;gap:10px;padding:14px 18px 10px;
+  background:#fff;border-bottom:1px solid var(--border);
+  position:-webkit-sticky;position:sticky;top:0;z-index:50;}
+.rp-top-title{font-size:16px;font-weight:800;color:var(--navy);flex:1;}
+.rp-step-badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;
+  background:#E8F8F5;color:var(--col-s);}
+/* sticky section tabs */
+.rp-stabs{display:flex;background:#fff;border-bottom:1px solid var(--border);
+  overflow-x:auto;-webkit-overflow-scrolling:touch;
+  position:-webkit-sticky;position:sticky;top:57px;z-index:40;}
+.rp-stabs::-webkit-scrollbar{display:none;}
+.rstab{flex-shrink:0;padding:10px 13px;font-size:11px;font-weight:600;
+  color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;
+  white-space:nowrap;transition:all .2s;}
+.rstab.on{color:var(--navy);border-bottom-color:var(--navy);}
+/* section anchors */
+.rp-sec{scroll-margin-top:108px;}
+/* hero */
+.rp-hero-v2{background:linear-gradient(160deg,#1A2F4E 0%,#6C2E7A 100%);
+  padding:28px 20px 24px;text-align:center;}
+.rp-emoji-circ{width:72px;height:72px;border-radius:50%;
+  background:rgba(255,255,255,.18);display:flex;align-items:center;
+  justify-content:center;font-size:40px;margin:0 auto 12px;
+  border:2px solid rgba(255,255,255,.3);}
+.rp-type-name{font-size:26px;font-weight:900;color:#fff;letter-spacing:-.5px;margin-bottom:5px;}
+.rp-type-tag{display:inline-block;background:rgba(255,255,255,.15);border-radius:10px;
+  padding:4px 12px;font-size:11px;color:rgba(255,255,255,.9);font-weight:700;margin-bottom:10px;}
+.rp-type-desc{font-size:12px;color:rgba(255,255,255,.75);line-height:1.65;text-align:left;
+  background:rgba(255,255,255,.08);border-radius:12px;padding:12px 14px;}
+/* summary tiles */
+.rp-sum-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px;
+  background:#fff;border-bottom:1px solid var(--border);}
+.rp-stile{background:var(--bg);border-radius:12px;padding:10px 6px;text-align:center;}
+.rp-stile-ax{font-size:9px;font-weight:900;margin-bottom:2px;}
+.rp-stile-val{font-size:12px;font-weight:800;color:var(--text);}
+.rp-stile-sub{font-size:9px;color:var(--muted);}
+/* card */
+.rp-card{background:#fff;border-radius:18px;padding:20px 18px;margin:12px 14px;
+  box-shadow:0 2px 14px rgba(0,0,0,.07);}
+.rp-card-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--col-b);margin-bottom:14px;}
+/* axis rows */
+.ax-badge-row{display:flex;align-items:center;gap:9px;margin-bottom:5px;}
+.ax-badge{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;
+  justify-content:center;font-size:11px;font-weight:900;color:#fff;flex-shrink:0;}
+.ax-name-txt{font-size:12px;font-weight:800;color:var(--text);flex:1;}
+.ax-score-txt{font-size:12px;font-weight:800;}
+.ax-track{background:#eaeffa;border-radius:8px;height:9px;overflow:hidden;margin-bottom:4px;}
+.ax-fill{height:100%;border-radius:8px;width:0;transition:width .9s ease;}
+.ax-poles{display:flex;justify-content:space-between;font-size:9px;color:#bbb;margin-bottom:10px;}
+.ax-speech{background:#f4f6fb;border-radius:12px;padding:10px 13px;font-size:11px;
+  color:var(--navy);line-height:1.55;margin-bottom:16px;border-left:3px solid;}
+/* type combo */
+.type-combo-card{background:linear-gradient(135deg,rgba(26,47,78,.04),rgba(142,68,173,.04));
+  border-radius:16px;padding:14px 16px;border:1px solid rgba(142,68,173,.15);}
+.type-combo-title{font-size:12px;font-weight:800;color:var(--navy);margin-bottom:6px;}
+.type-combo-desc{font-size:12px;color:var(--muted);line-height:1.65;}
+/* insight cards */
+.ic-card{background:#f4f6fb;border-radius:14px;padding:14px 15px;
+  display:flex;gap:12px;align-items:flex-start;margin-bottom:10px;}
+.ic-card:last-child{margin-bottom:0;}
+.ic-icon{font-size:22px;flex-shrink:0;margin-top:1px;}
+.ic-body{flex:1;}
+.ic-title{font-size:13px;font-weight:800;color:var(--navy);margin-bottom:4px;}
+.ic-text{font-size:12px;color:#555;line-height:1.65;}
+/* sw grid */
+.sw-grid4{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.sw4-item{border-radius:12px;padding:11px 12px;}
+.sw4-lbl{font-size:9px;font-weight:700;letter-spacing:.06em;margin-bottom:4px;}
+.sw4-txt{font-size:12px;font-weight:700;color:var(--text);}
+/* warning */
+.warn-banner{background:#FEF9E7;border-radius:14px;padding:12px 14px;margin-bottom:10px;
+  display:flex;gap:10px;align-items:flex-start;border-left:4px solid var(--yellow);}
+.warn-banner:last-child{margin-bottom:0;}
+.warn-icon{font-size:18px;flex-shrink:0;}
+.warn-body h5{font-size:12px;font-weight:800;color:var(--text);margin-bottom:3px;}
+.warn-body p{font-size:11px;color:var(--muted);line-height:1.5;}
+/* invite lock */
+.inv-lock-banner{background:linear-gradient(135deg,#2C3E50,#34495E);border-radius:16px;
+  padding:20px 18px;color:#fff;text-align:center;margin-bottom:12px;}
+.inv-lock-title{font-size:16px;font-weight:800;margin-bottom:8px;}
+.inv-lock-desc{font-size:12px;color:rgba(255,255,255,.7);line-height:1.6;margin-bottom:16px;}
+.inv-btn{width:100%;padding:15px;border:none;border-radius:14px;font-size:15px;font-weight:800;
+  cursor:pointer;background:linear-gradient(135deg,var(--col-s),#27AE60);color:#fff;
+  box-shadow:0 6px 20px rgba(26,122,110,.4);}
+.inv-btn:active{transform:scale(.97);}
+.sample-msg-bubble{background:#FEE500;border-radius:14px;padding:12px 14px;}
+.sample-msg-bubble p{font-size:11px;color:#3C1E1E;line-height:1.6;}
+
+/* ══ 초대 화면 ══ */
+#s-invite{background:var(--bg);}
+.inv-hero{background:linear-gradient(135deg,var(--green),#1E8449);padding:36px 22px 24px;
+  color:#fff;text-align:center;flex-shrink:0;}
+.inv-hero h2{font-size:20px;font-weight:900;margin-bottom:7px;}
+.inv-hero p{font-size:12px;color:rgba(255,255,255,.75);line-height:1.6;}
+.inv-body{padding:18px;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding-bottom:calc(18px + env(safe-area-inset-bottom));}
+.link-box{background:#fff;border-radius:13px;padding:14px;margin-bottom:14px;
+  box-shadow:0 1px 8px rgba(0,0,0,.06);}
+.link-lbl{font-size:10px;color:var(--muted);margin-bottom:5px;}
+.link-url{font-size:12px;color:var(--green);font-weight:700;background:#EDF7EE;
+  border-radius:7px;padding:7px 11px;word-break:break-all;}
+.shr-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:13px;}
+.shr-btn{border:none;border-radius:12px;padding:12px;font-size:12px;font-weight:700;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;}
+.shr-kakao{background:#FEE500;color:#3C1E1E;}
+.shr-link{background:#EBF0F8;color:var(--navy);}
+.inv-card{background:#fff;border-radius:13px;padding:14px;margin-bottom:12px;
+  box-shadow:0 1px 8px rgba(0,0,0,.06);}
+.inv-card h4{font-size:13px;font-weight:800;color:var(--text);margin-bottom:6px;}
+.inv-card p{font-size:12px;color:var(--muted);line-height:1.6;}
+
+/* ══ 대기 ══ */
+#s-wait{background:linear-gradient(160deg,var(--navy),#4A235A);color:#fff;
+  text-align:center;padding:36px 24px;}
+.wait-icon{font-size:58px;margin-bottom:18px;animation:fl 3s ease-in-out infinite;}
+@keyframes fl{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
+.wait-ttl{font-size:21px;font-weight:800;margin-bottom:8px;}
+.wait-sub{font-size:13px;color:rgba(255,255,255,.6);line-height:1.6;margin-bottom:26px;}
+.wait-box{background:rgba(255,255,255,.1);border-radius:13px;padding:14px;margin-bottom:24px;width:100%;}
+.wait-row{display:flex;align-items:center;gap:9px;font-size:12px;color:rgba(255,255,255,.8);}
+.wdot{width:9px;height:9px;border-radius:50%;background:#00b894;
+  animation:blink 1.5s ease-in-out infinite;}
+
+/* ══════════════════════════════════════
+   커플 MRI 결과 화면 (v2)
+══════════════════════════════════════ */
+#s-rc{background:var(--bg);}
+.rc-top-bar{display:flex;align-items:center;gap:10px;padding:14px 18px 10px;
+  background:#fff;border-bottom:1px solid var(--border);
+  position:-webkit-sticky;position:sticky;top:0;z-index:50;}
+.rc-top-title{font-size:16px;font-weight:800;color:var(--navy);flex:1;}
+.rc-unlock-badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;
+  background:#E8F8F5;color:var(--col-s);}
+.rc-stabs{display:flex;background:#fff;border-bottom:1px solid var(--border);
+  overflow-x:auto;-webkit-overflow-scrolling:touch;
+  position:-webkit-sticky;position:sticky;top:57px;z-index:40;}
+.rc-stabs::-webkit-scrollbar{display:none;}
+.rcstab{flex-shrink:0;padding:10px 14px;font-size:11px;font-weight:600;
+  color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;
+  white-space:nowrap;transition:all .2s;}
+.rcstab.on{color:var(--navy);border-bottom-color:var(--navy);}
+.rc-sec{scroll-margin-top:108px;}
+/* couple hero */
+.couple-hero{background:linear-gradient(160deg,#1A2F4E 0%,#2C6E49 100%);
+  padding:28px 20px 26px;text-align:center;}
+.avatars-row{display:flex;justify-content:center;align-items:center;gap:10px;margin-bottom:18px;}
+.c-avatar{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:26px;border:3px solid rgba(255,255,255,.4);
+  box-shadow:0 4px 14px rgba(0,0,0,.3);}
+.c-av-a{background:rgba(36,113,163,.55);}
+.c-av-b{background:rgba(142,68,173,.55);}
+.match-num-big{font-size:52px;font-weight:900;color:#fff;letter-spacing:-.05em;line-height:1;}
+.match-label{font-size:13px;color:rgba(255,255,255,.65);margin-top:4px;}
+.match-desc{font-size:12px;color:rgba(255,255,255,.75);margin-top:10px;line-height:1.6;
+  background:rgba(255,255,255,.1);border-radius:10px;padding:10px 14px;text-align:left;}
+/* rc card */
+.rc-card{margin:12px 14px;background:#fff;border-radius:18px;padding:20px 18px;
+  box-shadow:0 2px 14px rgba(0,0,0,.07);}
+.rc-card-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--col-b);margin-bottom:14px;}
+/* PHBS compare bars */
+.axis-names-row{display:grid;grid-template-columns:1fr 40px 1fr;
+  font-size:11px;font-weight:700;margin-bottom:10px;}
+.an-a{color:var(--col-b);text-align:right;}
+.an-b{color:var(--col-h);text-align:left;}
+.axis-compare-row{display:grid;grid-template-columns:1fr 40px 1fr;
+  align-items:center;gap:4px;margin-bottom:4px;}
+.bar-side{height:12px;border-radius:6px;overflow:hidden;}
+.bar-side-a{display:flex;justify-content:flex-end;}
+.bar-side-b{display:flex;justify-content:flex-start;}
+.bar-fill-side{height:100%;border-radius:6px;transition:width 1s ease;}
+.axis-mid{width:40px;height:28px;border-radius:7px;display:flex;align-items:center;
+  justify-content:center;font-size:11px;font-weight:800;color:#fff;}
+.axis-subtag{display:grid;grid-template-columns:1fr 40px 1fr;
+  font-size:9px;color:var(--muted);margin-bottom:14px;}
+.ast-a{text-align:right;}
+.ast-b{text-align:left;}
+.conflict-alert{margin-top:14px;padding:12px 14px;background:#FDEDEC;
+  border-radius:12px;border-left:4px solid var(--red);}
+.conflict-title{font-size:12px;font-weight:800;color:#C0392B;margin-bottom:4px;}
+.conflict-body{font-size:11px;color:#555;line-height:1.65;}
+/* signal */
+.legend-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.legend-pill{font-size:10px;font-weight:600;padding:4px 10px;border-radius:12px;}
+.signal-list{display:flex;flex-direction:column;gap:10px;}
+.signal-item-v2{border-radius:14px;padding:14px 15px;}
+.signal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.signal-name{font-size:14px;font-weight:800;color:var(--navy);}
+.signal-meta{display:flex;align-items:center;gap:6px;}
+.signal-pct{font-size:13px;font-weight:800;}
+.signal-light{font-size:18px;}
+.match-bar-wrap{height:6px;background:rgba(0,0,0,.1);border-radius:3px;overflow:hidden;margin-bottom:6px;}
+.match-bar-v2{height:100%;border-radius:3px;transition:width 1s ease;}
+.signal-details{font-size:11px;color:#555;line-height:1.7;}
+/* talk cards v2 */
+.talk-card-v2{border-radius:16px;padding:17px 16px;margin-bottom:12px;
+  position:relative;overflow:hidden;border-left:4px solid;}
+.talk-card-num{position:absolute;right:14px;top:10px;font-size:36px;font-weight:900;
+  opacity:.1;line-height:1;}
+.talk-domain-tag{font-size:10px;font-weight:700;letter-spacing:.06em;padding:4px 10px;
+  border-radius:10px;display:inline-flex;align-items:center;gap:4px;margin-bottom:10px;color:#fff;}
+.talk-q-v2{font-size:15px;font-weight:800;color:var(--navy);margin-bottom:12px;line-height:1.45;}
+.talk-split-v2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.split-box-v2{padding:10px 11px;border-radius:12px;font-size:11px;line-height:1.55;}
+.split-name-v2{font-size:10px;font-weight:800;margin-bottom:4px;}
+.talk-punchline{margin-top:10px;padding:9px 12px;border-radius:10px;
+  font-size:11px;font-weight:600;line-height:1.6;}
+/* insight banner */
+.ins-banner-v2{margin:0 14px 12px;border-radius:18px;padding:20px 18px;
+  background:linear-gradient(135deg,var(--navy) 0%,#2C6080 100%);color:#fff;
+  position:relative;overflow:hidden;}
+.ins-banner-v2::before{content:'';position:absolute;top:-30px;right:-30px;
+  width:100px;height:100px;background:rgba(255,255,255,.06);border-radius:50%;}
+.ib-tag{font-size:10px;font-weight:700;letter-spacing:.1em;background:rgba(255,255,255,.15);
+  padding:4px 10px;border-radius:10px;display:inline-block;margin-bottom:12px;}
+.ib-text{font-size:13px;line-height:1.75;color:rgba(255,255,255,.9);}
+/* share */
+.share-grid-v2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.share-btn-box{border-radius:14px;padding:16px 14px;display:flex;flex-direction:column;
+  align-items:center;gap:8px;cursor:pointer;border:none;transition:transform .15s;}
+.share-btn-box:active{transform:scale(.96);}
+.sbb-icon{font-size:26px;}
+.sbb-label{font-size:12px;font-weight:700;}
+.sbb-desc{font-size:10px;text-align:center;line-height:1.5;color:#888;}
+.main-share-btn{width:100%;padding:17px;border:none;border-radius:16px;font-size:16px;
+  font-weight:800;cursor:pointer;margin-bottom:10px;
+  background:linear-gradient(135deg,var(--green),#27AE60);color:#fff;
+  box-shadow:0 8px 24px rgba(74,124,63,.45);}
+.upgrade-card{border-radius:16px;padding:18px 16px;
+  background:linear-gradient(135deg,#2C3E50,#4A235A);color:#fff;margin-top:10px;}
+.uc-tag{font-size:10px;font-weight:700;background:rgba(255,255,255,.15);
+  padding:3px 9px;border-radius:8px;display:inline-block;margin-bottom:10px;}
+.uc-title{font-size:15px;font-weight:800;margin-bottom:6px;}
+.uc-desc{font-size:12px;color:rgba(255,255,255,.75);line-height:1.6;margin-bottom:14px;}
+.uc-btn{width:100%;padding:13px;border:none;border-radius:12px;font-size:14px;
+  font-weight:800;cursor:pointer;
+  background:linear-gradient(90deg,var(--col-p),var(--yellow));color:#fff;}
+
+/* ══════════════════════════════════════
+   [개편] 개인MRI - 대화촉발형 UX
+══════════════════════════════════════ */
+/* 핵심 위험 패턴 히어로 */
+.danger-hero{background:linear-gradient(160deg,#1a0a0a 0%,#4a1010 45%,#1A2F4E 100%);
+  padding:28px 20px 24px;text-align:center;}
+.danger-badge{display:inline-block;background:rgba(231,76,60,.85);color:#fff;
+  font-size:10px;font-weight:800;letter-spacing:.08em;padding:4px 12px;border-radius:20px;
+  margin-bottom:14px;}
+.danger-emoji{font-size:42px;margin-bottom:8px;}
+.danger-type-name{font-size:22px;font-weight:900;color:#fff;margin-bottom:5px;}
+.danger-type-tags{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:16px;}
+.danger-tag{background:rgba(255,255,255,.15);border-radius:8px;padding:3px 10px;
+  font-size:10px;color:rgba(255,255,255,.85);font-weight:700;}
+.danger-core{background:rgba(231,76,60,.2);border:1px solid rgba(231,76,60,.5);
+  border-radius:14px;padding:14px 16px;margin-bottom:12px;text-align:left;}
+.danger-core-label{font-size:9px;font-weight:800;color:#FF6B6B;letter-spacing:.1em;
+  margin-bottom:7px;}
+.danger-core-text{font-size:16px;font-weight:900;color:#fff;line-height:1.5;}
+.danger-detail{background:rgba(255,255,255,.08);border-radius:12px;padding:12px 14px;
+  font-size:12px;color:rgba(255,255,255,.8);line-height:1.7;text-align:left;}
+/* 기억 한 가지 배너 */
+.action-banner{background:linear-gradient(135deg,#27AE60,#1A7A6E);border-radius:16px;
+  padding:17px 18px;margin:12px 14px;display:flex;gap:13px;align-items:flex-start;}
+.action-icon{font-size:26px;flex-shrink:0;margin-top:2px;}
+.action-body{}
+.action-label{font-size:9px;font-weight:800;letter-spacing:.1em;color:rgba(255,255,255,.7);
+  margin-bottom:6px;}
+.action-text{font-size:14px;font-weight:800;color:#fff;line-height:1.5;}
+/* 갈등 반응 섹션 */
+.reaction-card{background:#fff;border-radius:18px;padding:20px 18px;margin:12px 14px;
+  box-shadow:0 2px 14px rgba(0,0,0,.07);}
+.reaction-header{font-size:13px;font-weight:800;color:var(--navy);margin-bottom:4px;}
+.reaction-sub{font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.5;}
+.reaction-item{display:flex;gap:11px;align-items:flex-start;margin-bottom:12px;
+  background:#f4f6fb;border-radius:13px;padding:12px 13px;}
+.reaction-item:last-child{margin-bottom:0;}
+.reaction-icon{font-size:20px;flex-shrink:0;}
+.reaction-content{}
+.reaction-label{font-size:9px;font-weight:800;letter-spacing:.06em;color:var(--muted);
+  margin-bottom:4px;}
+.reaction-text{font-size:13px;font-weight:700;color:var(--text);line-height:1.5;}
+/* 파트너 초대 CTA 메인 */
+.invite-hero-v2{background:linear-gradient(160deg,#1A2F4E,#2C6E49);
+  padding:28px 20px 24px;text-align:center;}
+.invite-lock-v2{font-size:44px;margin-bottom:12px;}
+.invite-title-v2{font-size:20px;font-weight:900;color:#fff;margin-bottom:8px;}
+.invite-desc-v2{font-size:12px;color:rgba(255,255,255,.7);line-height:1.65;margin-bottom:20px;}
+.invite-btn-v2{width:100%;padding:17px;border:none;border-radius:16px;font-size:16px;
+  font-weight:900;cursor:pointer;background:linear-gradient(135deg,#27AE60,#1A7A6E);
+  color:#fff;box-shadow:0 8px 24px rgba(26,122,110,.5);letter-spacing:-.3px;}
+.invite-btn-v2:active{transform:scale(.97);}
+.kakao-bubble{background:rgba(255,255,255,.1);border-radius:14px;padding:14px 16px;
+  margin:12px 14px;text-align:left;}
+.kakao-label{font-size:10px;font-weight:700;color:rgba(255,255,255,.5);margin-bottom:7px;}
+.kakao-text{font-size:12px;color:rgba(255,255,255,.85);line-height:1.7;}
+
+/* ══════════════════════════════════════
+   [개편] 커플MRI - 대화촉발형 UX
+══════════════════════════════════════ */
+/* 핵심 과제 히어로 */
+.task-hero{background:linear-gradient(160deg,#1A2F4E 0%,#1A3A2A 100%);
+  padding:28px 20px 26px;text-align:center;}
+.task-couple-row{display:flex;justify-content:center;align-items:center;gap:10px;margin-bottom:14px;}
+.task-avatar{background:rgba(255,255,255,.15);border-radius:50%;width:52px;height:52px;
+  display:flex;align-items:center;justify-content:center;font-size:22px;
+  border:2px solid rgba(255,255,255,.3);}
+.task-type-label{font-size:11px;font-weight:700;color:rgba(255,255,255,.7);
+  background:rgba(255,255,255,.12);padding:3px 9px;border-radius:8px;margin-top:6px;}
+.task-vs{font-size:18px;color:rgba(255,255,255,.5);}
+.task-badge{display:inline-block;background:rgba(231,76,60,.85);color:#fff;
+  font-size:10px;font-weight:800;letter-spacing:.08em;padding:4px 12px;
+  border-radius:20px;margin-bottom:12px;}
+.task-title{font-size:20px;font-weight:900;color:#fff;line-height:1.4;margin-bottom:8px;}
+.task-desc{font-size:12px;color:rgba(255,255,255,.75);line-height:1.7;
+  background:rgba(255,255,255,.09);border-radius:12px;padding:12px 14px;
+  text-align:left;margin-bottom:18px;}
+.task-start-btn{width:100%;padding:15px;border:none;border-radius:14px;font-size:15px;
+  font-weight:800;cursor:pointer;background:linear-gradient(135deg,#E74C3C,#C0392B);
+  color:#fff;box-shadow:0 6px 20px rgba(192,57,43,.45);}
+.task-start-btn:active{transform:scale(.97);}
+
+/* 대화 카드 v3 (실전형) */
+.talk-v3-card{background:#fff;border-radius:18px;margin:12px 14px;overflow:hidden;
+  box-shadow:0 3px 16px rgba(0,0,0,.09);}
+.talk-v3-header{padding:16px 18px 12px;border-bottom:1px solid var(--border);}
+.talk-v3-num{font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--muted);
+  margin-bottom:6px;}
+.talk-v3-topic{font-size:16px;font-weight:900;color:var(--navy);line-height:1.4;}
+.talk-v3-why{padding:12px 18px;background:#FEF9E7;display:flex;gap:10px;align-items:flex-start;}
+.talk-v3-why-icon{font-size:16px;flex-shrink:0;}
+.talk-v3-why-text{font-size:11px;color:#7D6608;line-height:1.6;font-weight:600;}
+.talk-v3-diff{padding:14px 18px;background:#F8F9FB;}
+.talk-v3-diff-title{font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--muted);
+  margin-bottom:10px;}
+.talk-v3-split{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.talk-v3-box{border-radius:12px;padding:10px 12px;}
+.talk-v3-who{font-size:10px;font-weight:800;margin-bottom:4px;}
+.talk-v3-choice{font-size:12px;font-weight:700;color:var(--text);line-height:1.4;}
+.talk-v3-starter{padding:14px 18px;background:#EBF5FB;display:flex;gap:10px;align-items:flex-start;}
+.talk-v3-starter-icon{font-size:16px;flex-shrink:0;}
+.talk-v3-starter-body{}
+.talk-v3-starter-label{font-size:10px;font-weight:800;color:var(--col-b);margin-bottom:5px;}
+.talk-v3-starter-text{font-size:13px;font-weight:700;color:var(--navy);line-height:1.55;
+  font-style:italic;}
+.talk-v3-agree{padding:12px 18px 16px;display:flex;gap:10px;align-items:flex-start;}
+.talk-v3-agree-icon{font-size:15px;flex-shrink:0;margin-top:2px;}
+.talk-v3-agree-text{font-size:11px;color:#1A7A6E;font-weight:700;line-height:1.6;}
+
+/* 기질 조합 해석 */
+.combo-card{background:#fff;border-radius:18px;margin:12px 14px;overflow:hidden;
+  box-shadow:0 2px 14px rgba(0,0,0,.07);}
+.combo-header{background:linear-gradient(135deg,var(--navy),#4A235A);padding:18px 18px 14px;}
+.combo-types{display:flex;justify-content:center;align-items:center;gap:10px;margin-bottom:12px;}
+.combo-type-chip{background:rgba(255,255,255,.18);border-radius:10px;padding:6px 12px;
+  font-size:13px;font-weight:800;color:#fff;}
+.combo-vs{font-size:14px;color:rgba(255,255,255,.5);}
+.combo-title{font-size:15px;font-weight:800;color:#fff;margin-bottom:5px;text-align:center;}
+.combo-body{padding:16px 18px;}
+.combo-section{margin-bottom:13px;}
+.combo-section:last-child{margin-bottom:0;}
+.combo-section-label{font-size:10px;font-weight:800;letter-spacing:.08em;
+  color:var(--muted);margin-bottom:7px;}
+.combo-section-text{font-size:13px;color:var(--text);line-height:1.65;}
+.combo-hint{background:#E8F8F5;border-radius:12px;padding:12px 14px;
+  font-size:13px;font-weight:700;color:var(--col-s);line-height:1.55;}
+
+/* 가치관 조율 상태 (라벨형) */
+.val-status-list{display:flex;flex-direction:column;gap:10px;}
+.val-status-item{border-radius:14px;padding:14px 16px;}
+.val-status-item.safe{background:#EAFAF1;border-left:4px solid #27AE60;}
+.val-status-item.caution{background:#FEF9E7;border-left:4px solid #E67E22;}
+.val-status-item.conflict{background:#FDEDEC;border-left:4px solid #E74C3C;}
+.val-status-item.critical{background:#F5EEF8;border-left:4px solid #8E44AD;}
+.val-status-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.val-status-name{font-size:14px;font-weight:800;color:var(--navy);}
+.val-status-label{font-size:11px;font-weight:800;padding:3px 10px;border-radius:10px;}
+.val-status-label.safe{background:#D5F5E3;color:#1A7A6E;}
+.val-status-label.caution{background:#FDEBD0;color:#A04000;}
+.val-status-label.conflict{background:#FADBD8;color:#C0392B;}
+.val-status-label.critical{background:#E8DAEF;color:#6C3483;}
+.val-status-desc{font-size:11px;color:#555;line-height:1.6;}
+
+/* 관계 규칙 카드 */
+.rule-card{background:#fff;border-radius:18px;margin:12px 14px;
+  box-shadow:0 2px 14px rgba(0,0,0,.07);overflow:hidden;}
+.rule-card-header{background:linear-gradient(135deg,#1A2F4E,#2C6E49);
+  padding:14px 18px;display:flex;align-items:center;gap:10px;}
+.rule-num{background:rgba(255,255,255,.2);border-radius:50%;width:26px;height:26px;
+  display:flex;align-items:center;justify-content:center;font-size:12px;
+  font-weight:900;color:#fff;flex-shrink:0;}
+.rule-title{font-size:14px;font-weight:800;color:#fff;}
+.rule-body{padding:14px 18px;}
+.rule-desc{font-size:13px;color:var(--text);line-height:1.65;margin-bottom:10px;}
+.rule-practice{background:#EBF5FB;border-radius:10px;padding:10px 12px;
+  font-size:12px;color:var(--col-b);font-weight:700;line-height:1.5;}
+
+/* 공유/대화시작 CTA */
+.cta-section{margin:12px 14px;}
+.cta-talk-btn{width:100%;padding:17px;border:none;border-radius:16px;font-size:16px;
+  font-weight:900;cursor:pointer;margin-bottom:10px;
+  background:linear-gradient(135deg,#E74C3C,#8E44AD);color:#fff;
+  box-shadow:0 8px 24px rgba(142,68,173,.4);letter-spacing:-.3px;}
+.cta-talk-btn:active{transform:scale(.97);}
+.cta-share-btn{width:100%;padding:15px;border:none;border-radius:14px;font-size:15px;
+  font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--green),#27AE60);
+  color:#fff;box-shadow:0 6px 20px rgba(74,124,63,.4);}
+.cta-share-btn:active{transform:scale(.97);}
+
+</style>
+</head>
+<body>
+<div class="phone">
+
+<!-- ══ 랜딩 ══ -->
+<div id="s-land" class="scr on">
+  <div class="land-logo">💑</div>
+  <div class="land-title">We+ 커플 MRI</div>
+  <div class="land-sub">심리과학 기반 커플 관계 분석<br>두 사람의 기질과 가치관을 X-Ray처럼 들여다보세요</div>
+  <div class="land-chips">
+    <span class="chip">🧬 PHBS 4축 분석</span>
+    <span class="chip">⏱ 약 10분</span>
+    <span class="chip">🔬 40문항</span>
+    <span class="chip">Gottman 이론 기반</span>
+  </div>
+  <div class="land-steps">
+    <h4>진행 방식</h4>
+    <div class="srow"><div class="snum">1</div><span>기질·성향 20문항 응답 (약 5분)</span></div>
+    <div class="srow"><div class="snum">2</div><span>결혼 가치관 20문항 응답 (약 5분)</span></div>
+    <div class="srow"><div class="snum">3</div><span>나의 PHBS 기질 프로파일 확인</span></div>
+    <div class="srow"><div class="snum">4</div><span>파트너에게 링크 공유</span></div>
+    <div class="srow"><div class="snum">5</div><span>커플 MRI 잠금 해제 🔓</span></div>
+  </div>
+  <button class="btn btn-primary" onclick="startSurvey()" style="touch-action:manipulation;-webkit-tap-highlight-color:transparent;">🚀 시작하기</button>
+  <p style="font-size:10px;color:rgba(255,255,255,.3);margin-top:12px;padding-bottom:env(safe-area-inset-bottom);">응답 데이터는 로컬에만 저장됩니다</p>
+</div>
+
+<!-- ══ 기질 설문 ══ -->
+<div id="s-st" class="scr">
+  <div class="sv-top">
+    <div class="sv-title">🧠 STEP 1 · 기질·성향 설문</div>
+    <div class="prog-wrap"><div class="prog" id="st-prog" style="width:5%"></div></div>
+    <div class="prog-txt" id="st-ptxt">1 / 20</div>
+  </div>
+  <div class="sv-body"><div id="st-body"></div></div>
+</div>
+
+<!-- ══ 가치관 설문 ══ -->
+<div id="s-sv" class="scr">
+  <div class="sv-top">
+    <div class="sv-title">💬 STEP 2 · 결혼 가치관 설문</div>
+    <div class="prog-wrap"><div class="prog" id="sv-prog" style="width:5%"></div></div>
+    <div class="prog-txt" id="sv-ptxt">1 / 20</div>
+  </div>
+  <div class="sv-body"><div id="sv-body"></div></div>
+</div>
+
+<!-- ══ 개인 로딩 ══ -->
+<div id="s-proc1" class="scr">
+  <div class="load-icon">🔬</div>
+  <div class="load-title">기질·가치관 분석 중…</div>
+  <div class="load-sub">당신의 PHBS 4축 프로파일을<br>과학적으로 분석하고 있습니다</div>
+  <div class="load-items">
+    <div class="load-item"><div class="ld" style="background:var(--col-p);animation-delay:0s"></div>P축 · 추격-회피 패턴 분석</div>
+    <div class="load-item"><div class="ld" style="background:var(--col-h);animation-delay:.3s"></div>H축 · 감정 온도 측정</div>
+    <div class="load-item"><div class="ld" style="background:var(--col-b);animation-delay:.6s"></div>B축 · 결합 지향성 계산</div>
+    <div class="load-item"><div class="ld" style="background:var(--col-s);animation-delay:.9s"></div>S축 · 애착 안정성 평가</div>
+  </div>
+</div>
+
+<!-- ══ 개인 MRI 결과 (v2 → 대화촉발형) ══ -->
+<div id="s-rp" class="scr">
+  <!-- sticky topbar -->
+  <div class="rp-top-bar">
+    <span style="font-size:20px;color:#666;cursor:pointer">←</span>
+    <span class="rp-top-title">나의 기질 MRI</span>
+    <span class="rp-step-badge">STEP 3 / 5</span>
+  </div>
+  <!-- sticky section tabs -->
+  <div class="rp-stabs" id="rp-tabs">
+    <div class="rstab on" onclick="rpScrollTo('rps-danger',this)">⚡ 핵심패턴</div>
+    <div class="rstab" onclick="rpScrollTo('rps-type',this)">나의 유형</div>
+    <div class="rstab" onclick="rpScrollTo('rps-reaction',this)">갈등 반응</div>
+    <div class="rstab" onclick="rpScrollTo('rps-invite',this)">💌 파트너 초대</div>
+  </div>
+
+  <!-- ⚡ 핵심 위험 패턴 (Hero) -->
+  <div id="rps-danger" class="rp-sec">
+    <div class="danger-hero">
+      <div class="danger-badge">⚡ 내 핵심 위험 패턴</div>
+      <div class="danger-emoji" id="rp-emoji">🔥</div>
+      <div class="danger-type-name" id="rp-type-name">-</div>
+      <div class="danger-type-tags" id="rp-type-tag">-</div>
+      <div class="danger-core">
+        <div class="danger-core-label">갈등이 생기면 나는</div>
+        <div class="danger-core-text" id="rp-danger-text">분석 중...</div>
+      </div>
+      <div class="danger-detail" id="rp-danger-detail">분석 중...</div>
+    </div>
+    <!-- 지금 당장 기억할 한 가지 -->
+    <div class="action-banner">
+      <div class="action-icon">🎯</div>
+      <div class="action-body">
+        <div class="action-label">지금 당장 기억할 한 가지</div>
+        <div class="action-text" id="rp-action-text">-</div>
+      </div>
+    </div>
+    <!-- 요약 타일 (보조) -->
+    <div class="rp-sum-tiles">
+      <div class="rp-stile">
+        <div class="rp-stile-ax" style="color:var(--col-p)">P축</div>
+        <div class="rp-stile-val" id="tile-p">-</div>
+        <div class="rp-stile-sub" id="tile-ps">-</div>
+      </div>
+      <div class="rp-stile">
+        <div class="rp-stile-ax" style="color:var(--col-h)">H축</div>
+        <div class="rp-stile-val" id="tile-h">-</div>
+        <div class="rp-stile-sub" id="tile-hs">-</div>
+      </div>
+      <div class="rp-stile">
+        <div class="rp-stile-ax" style="color:var(--col-b)">B축</div>
+        <div class="rp-stile-val" id="tile-b">-</div>
+        <div class="rp-stile-sub" id="tile-bs">-</div>
+      </div>
+      <div class="rp-stile">
+        <div class="rp-stile-ax" style="color:var(--col-s)">S축</div>
+        <div class="rp-stile-val" id="tile-s">-</div>
+        <div class="rp-stile-sub" id="tile-ss">-</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 나의 기질 유형 -->
+  <div id="rps-type" class="rp-sec">
+    <div class="rp-card">
+      <div class="rp-card-label">나의 PHBS 4축 프로파일</div>
+      <!-- P축 -->
+      <div class="ax-badge-row">
+        <div class="ax-badge" style="background:var(--col-p)">P</div>
+        <span class="ax-name-txt">추격-회피 패턴</span>
+        <span class="ax-score-txt" style="color:var(--col-p)" id="sc-p">-</span>
+      </div>
+      <div class="ax-track"><div class="ax-fill" id="bar-p" style="background:var(--col-p)"></div></div>
+      <div class="ax-poles"><span>← 회피형</span><span>추격형 →</span></div>
+      <div class="ax-speech" style="border-left-color:var(--col-p)" id="q-p">-</div>
+      <!-- H축 -->
+      <div class="ax-badge-row">
+        <div class="ax-badge" style="background:var(--col-h)">H</div>
+        <span class="ax-name-txt">감정 온도</span>
+        <span class="ax-score-txt" style="color:var(--col-h)" id="sc-h">-</span>
+      </div>
+      <div class="ax-track"><div class="ax-fill" id="bar-h" style="background:var(--col-h)"></div></div>
+      <div class="ax-poles"><span>← 저온 (냉정)</span><span>고온 (강렬) →</span></div>
+      <div class="ax-speech" style="border-left-color:var(--col-h)" id="q-h">-</div>
+      <!-- B축 -->
+      <div class="ax-badge-row">
+        <div class="ax-badge" style="background:var(--col-b)">B</div>
+        <span class="ax-name-txt">결합 지향성</span>
+        <span class="ax-score-txt" style="color:var(--col-b)" id="sc-b">-</span>
+      </div>
+      <div class="ax-track"><div class="ax-fill" id="bar-b" style="background:var(--col-b)"></div></div>
+      <div class="ax-poles"><span>← 독립 지향</span><span>결합 지향 →</span></div>
+      <div class="ax-speech" style="border-left-color:var(--col-b)" id="q-b">-</div>
+      <!-- S축 -->
+      <div class="ax-badge-row">
+        <div class="ax-badge" style="background:var(--col-s)">S</div>
+        <span class="ax-name-txt">관계 불안 수준</span>
+        <span class="ax-score-txt" style="color:var(--col-s)" id="sc-s">-</span>
+      </div>
+      <div class="ax-track"><div class="ax-fill" id="bar-s" style="background:var(--col-s)"></div></div>
+      <div class="ax-poles"><span>← 안정 애착</span><span>불안 애착 →</span></div>
+      <div class="ax-speech" style="border-left-color:var(--col-s)" id="q-s">-</div>
+      <!-- 유형 조합 (숨겨진 보조 ID - JS가 쓰는 용도 유지) -->
+      <div style="display:none">
+        <div id="type-combo-title"></div><div id="type-combo-desc"></div>
+      </div>
+    </div>
+    <!-- 유형 설명 -->
+    <div class="rp-card">
+      <div class="rp-card-label">이런 분이에요</div>
+      <div class="ic-card">
+        <div class="ic-icon">💡</div>
+        <div class="ic-body">
+          <div class="ic-title">핵심 특성</div>
+          <div class="ic-text" id="ins1-p">-</div>
+        </div>
+      </div>
+      <div class="ic-card" style="margin-bottom:0">
+        <div class="ic-icon">❤️</div>
+        <div class="ic-body">
+          <div class="ic-title">관계에서의 모습</div>
+          <div class="ic-text" id="ins2-p">-</div>
+        </div>
+      </div>
+      <div style="display:none" id="ins3-p"></div>
+    </div>
+  </div>
+
+  <!-- 갈등 상황에서 나는 -->
+  <div id="rps-reaction" class="rp-sec">
+    <div class="reaction-card">
+      <div class="reaction-header">갈등 상황에서 나는 이렇게 반응한다</div>
+      <div class="reaction-sub">아래 패턴을 알고 있으면 관계에서 실수를 줄일 수 있어요</div>
+      <div class="reaction-item">
+        <div class="reaction-icon">⚡</div>
+        <div class="reaction-content">
+          <div class="reaction-label">갈등 대처 스타일</div>
+          <div class="reaction-text" id="conflict-p">-</div>
+        </div>
+      </div>
+      <div class="reaction-item" style="background:#EAFAF1">
+        <div class="reaction-icon">💪</div>
+        <div class="reaction-content">
+          <div class="reaction-label">나의 강점</div>
+          <div class="reaction-text" id="sw1">-</div>
+        </div>
+      </div>
+      <div class="reaction-item" style="background:#FEF9E7">
+        <div class="reaction-icon">🌱</div>
+        <div class="reaction-content">
+          <div class="reaction-label">성장 포인트</div>
+          <div class="reaction-text" id="sw2">-</div>
+        </div>
+      </div>
+      <!-- 숨겨진 보조 ID 유지 -->
+      <div style="display:none"><span id="sw3"></span><span id="sw4"></span></div>
+    </div>
+    <!-- 주의 포인트 -->
+    <div class="rp-card">
+      <div class="rp-card-label">이것만은 꼭 조심하세요</div>
+      <div class="warn-banner">
+        <div class="warn-icon">⚠️</div>
+        <div class="warn-body"><h5 id="w1t">-</h5><p id="w1p">-</p></div>
+      </div>
+      <div class="warn-banner" style="background:#EBF5FB;border-left-color:var(--col-b)">
+        <div class="warn-icon">💬</div>
+        <div class="warn-body"><h5 id="w2t">-</h5><p id="w2p">-</p></div>
+      </div>
+      <div class="warn-banner" style="background:#EAFAF1;border-left-color:var(--green2)">
+        <div class="warn-icon">🌱</div>
+        <div class="warn-body"><h5 id="w3t">-</h5><p id="w3p">-</p></div>
+      </div>
+    </div>
+    <!-- 갈등 루프 -->
+    <div class="rp-card" style="background:linear-gradient(135deg,#FDEDEC,#F5EEF8);border:1px solid #FADBD8">
+      <div class="rp-card-label" style="color:#C0392B">관계 위험 루프</div>
+      <div style="font-size:13px;font-weight:700;color:var(--text);line-height:1.65" id="rp-loop">-</div>
+    </div>
+  </div>
+
+  <!-- 💌 파트너 초대 (메인 CTA) -->
+  <div id="rps-invite" class="rp-sec">
+    <div class="invite-hero-v2">
+      <div class="invite-lock-v2">🔒</div>
+      <div class="invite-title-v2">커플 MRI 잠금 해제하기</div>
+      <div class="invite-desc-v2">파트너가 응답을 완료하면<br>두 사람만의 커플 MRI가 열립니다<br><br>기질 비교 · 가치관 일치율 · 대화 주제 3가지<br>결혼 전 꼭 확인해야 할 정보가 기다리고 있어요</div>
+      <button class="invite-btn-v2" onclick="goScreen('s-invite')">💌 파트너에게 초대장 보내기</button>
+    </div>
+    <div class="kakao-bubble invite-hero-v2" style="background:transparent;border:none;padding:0 0 0 0">
+      <div class="rp-card" style="margin:12px 14px">
+        <div class="rp-card-label">📱 카카오톡 예시 메시지</div>
+        <div class="sample-msg-bubble">
+          <p id="kakao-msg">"나 We+ 커플 MRI 해봤는데 너도 해봐~ 10분이면 돼 🧬 우리 얼마나 잘 맞는지 같이 확인해 보자! [링크]"</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="height:20px"></div>
+</div>
+
+<!-- ══ 파트너 초대 ══ -->
+<div id="s-invite" class="scr">
+  <div class="inv-hero">
+    <h2>💌 파트너에게 공유하기</h2>
+    <p>파트너가 응답을 완료하면<br>두 사람만의 커플 MRI가 잠금 해제됩니다 🔓</p>
+  </div>
+  <div class="inv-body">
+    <div class="link-box" id="invite-link-box">
+      <div class="link-lbl">🔗 파트너 전용 링크 (8자리 코드)</div>
+      <div class="link-url" id="invite-link-url" style="font-size:12px;word-break:break-all;">링크 생성 중...</div>
+    </div>
+    <div style="background:#fff3cd;border-radius:10px;padding:10px 14px;font-size:12px;color:#856404;margin-bottom:12px;">
+      💡 위 링크를 카카오톡으로 파트너에게 보내세요
+    </div>
+    <div class="shr-grid">
+      <button class="shr-btn shr-kakao" onclick="shareKakao()">💛 카카오톡 전송</button>
+      <button class="shr-btn shr-link" id="invite-copy-btn" onclick="copyInviteLink()">🔗 링크 복사</button>
+    </div>
+    <div class="inv-card" id="invite-waiting-card">
+      <h4>⏳ 파트너 응답 대기 중</h4>
+      <p>파트너가 링크를 열고 응답 완료하면<br>커플 MRI가 <b>자동으로 잠금 해제</b>됩니다</p>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px;">이 화면을 열어 두거나, 나중에 같은 링크로 다시 접속하세요</p>
+    </div>
+    <button class="btn btn-green" onclick="goToWaiting()" style="margin-bottom:8px">⏳ 파트너 응답 확인하기</button>
+    <button class="btn btn-ghost" onclick="goScreen('s-rp')">← 내 결과로 돌아가기</button>
+  </div>
+</div>
+
+<!-- ══ 대기 ══ -->
+<div id="s-wait" class="scr">
+  <div class="wait-icon">⏳</div>
+  <div class="wait-ttl">파트너 응답 대기 중</div>
+  <div class="wait-sub">파트너가 링크를 열고<br>응답 완료하면 자동으로 열립니다</div>
+  <div class="wait-box">
+    <div class="wait-row"><div class="wdot"></div><span id="wait-status-txt">파트너 응답 기다리는 중...</span></div>
+    <div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,.5);">5초마다 자동 확인 중</div>
+  </div>
+  <div style="background:rgba(255,255,255,.1);border-radius:10px;padding:10px 14px;margin:0 0 16px;width:100%;">
+    <div style="font-size:10px;color:rgba(255,255,255,.5);margin-bottom:4px;">초대 코드</div>
+    <div id="wait-code" style="font-size:20px;font-weight:900;letter-spacing:4px;color:#fff;">------</div>
+  </div>
+  <button class="btn btn-ghost" style="color:#fff;border-color:rgba(255,255,255,.4);margin-bottom:8px" onclick="copyWaitLink()">🔗 링크 다시 복사</button>
+  <button class="btn btn-ghost" style="color:#fff;border-color:rgba(255,255,255,.4)" onclick="goScreen('s-invite')">← 초대 화면으로</button>
+</div>
+
+<!-- ══ 커플 로딩 ══ -->
+<div id="s-proc2" class="scr">
+  <div class="load-icon">🧬</div>
+  <div class="load-title">커플 MRI 생성 중…</div>
+  <div class="load-sub">두 사람의 데이터를 교차 분석하여<br>커플 MRI를 완성하고 있습니다</div>
+  <div class="load-items">
+    <div class="load-item"><div class="ld" style="background:var(--col-p);animation-delay:0s"></div>PHBS 4축 교차 분석</div>
+    <div class="load-item"><div class="ld" style="background:var(--green2);animation-delay:.3s"></div>가치관 5영역 일치율 계산</div>
+    <div class="load-item"><div class="ld" style="background:var(--yellow);animation-delay:.6s"></div>갈등 위험 영역 탐지</div>
+    <div class="load-item"><div class="ld" style="background:var(--col-h);animation-delay:.9s"></div>대화 주제 3가지 선별</div>
+  </div>
+</div>
+
+<!-- ══ 커플 MRI 결과 (v2 → 대화촉발형) ══ -->
+<div id="s-rc" class="scr">
+  <!-- sticky topbar -->
+  <div class="rc-top-bar">
+    <span style="font-size:20px;color:#666">←</span>
+    <span class="rc-top-title">커플 MRI 결과</span>
+    <span class="rc-unlock-badge">🔓 잠금 해제</span>
+  </div>
+  <!-- sticky section tabs -->
+  <div class="rc-stabs" id="rc-tabs">
+    <div class="rcstab on" onclick="rcScrollTo('rcs-task',this)">🎯 핵심과제</div>
+    <div class="rcstab" onclick="rcScrollTo('rcs-talk',this)">💬 대화 3가지</div>
+    <div class="rcstab" onclick="rcScrollTo('rcs-phbs',this)">기질 비교</div>
+    <div class="rcstab" onclick="rcScrollTo('rcs-vals',this)">가치관</div>
+    <div class="rcstab" onclick="rcScrollTo('rcs-rules',this)">관계 규칙</div>
+  </div>
+
+  <!-- 🎯 우리 커플의 핵심 과제 (Hero) -->
+  <div id="rcs-task" class="rc-sec">
+    <div class="task-hero">
+      <div class="task-couple-row">
+        <div style="text-align:center">
+          <div class="task-avatar">👩</div>
+          <div class="task-type-label" id="c-my-type-label">나</div>
+        </div>
+        <div class="task-vs">↔</div>
+        <div style="text-align:center">
+          <div class="task-avatar">👨</div>
+          <div class="task-type-label" id="c-partner-type-label">파트너</div>
+        </div>
+      </div>
+      <div class="task-badge">🎯 결혼 전 반드시 해결할 과제 1가지</div>
+      <div class="task-title" id="c-core-task-title">두 사람의 핵심 과제</div>
+      <div class="task-desc" id="c-core-task-desc">분석 중...</div>
+      <button class="task-start-btn" onclick="rcScrollTo('rcs-talk',document.querySelector('#rc-tabs .rcstab:nth-child(2)'))">
+        💬 지금 대화 시작하기
+      </button>
+    </div>
+    <!-- 전체 일치율 (보조) -->
+    <div class="rc-card">
+      <div class="rc-card-label">가치관 전체 일치 현황</div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="font-size:42px;font-weight:900;color:var(--navy)" id="c-pct">0%</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px" id="c-match-desc">분석 중...</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.5">퍼센트보다 중요한 것은<br>어떤 부분에서 다른가입니다</div>
+        </div>
+      </div>
+      <!-- 숨겨진 보조 ID 유지 -->
+      <div style="display:none" id="c-sum-items"></div>
+    </div>
+  </div>
+
+  <!-- 💬 지금 시작할 대화 3가지 (실전형) -->
+  <div id="rcs-talk" class="rc-sec">
+    <div style="padding:12px 14px 6px">
+      <div style="font-size:15px;font-weight:900;color:var(--navy);margin-bottom:4px">지금 시작할 대화 3가지</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.6">두 사람의 차이가 가장 큰 영역에서 선별했어요.<br>카드 순서대로 대화해보세요.</div>
+    </div>
+    <div id="c-talk-cards"></div>
+  </div>
+
+  <!-- 기질 비교 -->
+  <div id="rcs-phbs" class="rc-sec">
+    <div class="combo-card">
+      <div class="combo-header">
+        <div class="combo-types">
+          <div class="combo-type-chip" id="c-my-combo-chip">나</div>
+          <div class="combo-vs">↔</div>
+          <div class="combo-type-chip" id="c-partner-combo-chip">파트너</div>
+        </div>
+        <div class="combo-title" id="c-combo-title">기질 조합 분석</div>
+      </div>
+      <div class="combo-body">
+        <div class="combo-section">
+          <div class="combo-section-label">이런 갈등이 자주 나타날 수 있어요</div>
+          <div class="combo-section-text" id="c-conflict-body">-</div>
+        </div>
+        <div class="combo-section">
+          <div class="combo-section-label">해결 힌트</div>
+          <div class="combo-hint" id="c-combo-hint">-</div>
+        </div>
+      </div>
+    </div>
+    <!-- PHBS 수치 비교 (보조) -->
+    <div class="rc-card">
+      <div class="rc-card-label">PHBS 4축 수치 비교</div>
+      <div class="axis-names-row">
+        <div class="an-a">나 →</div><div></div><div class="an-b">← 파트너</div>
+      </div>
+      <!-- P축 -->
+      <div class="axis-compare-row">
+        <div class="bar-side bar-side-a" style="background:#FAD7A0">
+          <div class="bar-fill-side" id="pA" style="width:0%;background:linear-gradient(90deg,#D35400,#E67E22)"></div>
+        </div>
+        <div class="axis-mid" style="background:#D35400">P</div>
+        <div class="bar-side bar-side-b" style="background:#FAD7A0">
+          <div class="bar-fill-side" id="pB" style="width:0%;background:#E67E22;opacity:.6"></div>
+        </div>
+      </div>
+      <div class="axis-subtag"><div class="ast-a" id="pa-tag">-</div><div></div><div class="ast-b" id="pb-tag">-</div></div>
+      <!-- H축 -->
+      <div class="axis-compare-row">
+        <div class="bar-side bar-side-a" style="background:#E8DAEF">
+          <div class="bar-fill-side" id="hA" style="width:0%;background:linear-gradient(90deg,#8E44AD,#A569BD)"></div>
+        </div>
+        <div class="axis-mid" style="background:#8E44AD">H</div>
+        <div class="bar-side bar-side-b" style="background:#E8DAEF">
+          <div class="bar-fill-side" id="hB" style="width:0%;background:#A569BD;opacity:.6"></div>
+        </div>
+      </div>
+      <div class="axis-subtag"><div class="ast-a" id="ha-tag">-</div><div></div><div class="ast-b" id="hb-tag">-</div></div>
+      <!-- B축 -->
+      <div class="axis-compare-row">
+        <div class="bar-side bar-side-a" style="background:#D6EAF8">
+          <div class="bar-fill-side" id="bA" style="width:0%;background:linear-gradient(90deg,#2471A3,#5499C7)"></div>
+        </div>
+        <div class="axis-mid" style="background:#2471A3">B</div>
+        <div class="bar-side bar-side-b" style="background:#D6EAF8">
+          <div class="bar-fill-side" id="bB" style="width:0%;background:#5499C7;opacity:.6"></div>
+        </div>
+      </div>
+      <div class="axis-subtag"><div class="ast-a" id="ba-tag">-</div><div></div><div class="ast-b" id="bb-tag">-</div></div>
+      <!-- S축 -->
+      <div class="axis-compare-row">
+        <div class="bar-side bar-side-a" style="background:#D5F5E3">
+          <div class="bar-fill-side" id="sA" style="width:0%;background:linear-gradient(90deg,#1A7A6E,#48C9B0)"></div>
+        </div>
+        <div class="axis-mid" style="background:#1A7A6E">S</div>
+        <div class="bar-side bar-side-b" style="background:#D5F5E3">
+          <div class="bar-fill-side" id="sB" style="width:0%;background:#48C9B0;opacity:.6"></div>
+        </div>
+      </div>
+      <div class="axis-subtag"><div class="ast-a" id="sa-tag">-</div><div></div><div class="ast-b" id="sb-tag">-</div></div>
+      <!-- 숨겨진 보조 -->
+      <div style="display:none">
+        <div id="c-conflict-alert"></div>
+        <div id="c-conflict-title"></div>
+        <div id="c-insight-text"></div>
+        <div id="c-best-title"></div><div id="c-best-text"></div>
+        <div id="c-risk-title"></div><div id="c-risk-text"></div>
+        <div id="c-suggest"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 가치관 조율 상태 (라벨형) -->
+  <div id="rcs-vals" class="rc-sec">
+    <div style="padding:12px 14px 6px">
+      <div style="font-size:15px;font-weight:900;color:var(--navy);margin-bottom:4px">가치관 조율 상태</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.6">퍼센트가 아니라 "지금 어떤 상태인가"로 봐주세요</div>
+    </div>
+    <div class="rc-card">
+      <div class="legend-row">
+        <div class="legend-pill" style="background:#EAFAF1;color:#1E8449">✅ 비교적 안정</div>
+        <div class="legend-pill" style="background:#FEF9E7;color:#B7770D">🔶 조율 필요</div>
+        <div class="legend-pill" style="background:#FDEDEC;color:#C0392B">🔴 핵심 충돌</div>
+        <div class="legend-pill" style="background:#F5EEF8;color:#6C3483">⚡ 합의 필요</div>
+      </div>
+      <div class="val-status-list" id="c-signal-list"></div>
+    </div>
+  </div>
+
+  <!-- 우리 관계를 지키는 규칙 -->
+  <div id="rcs-rules" class="rc-sec">
+    <div style="padding:12px 14px 6px">
+      <div style="font-size:15px;font-weight:900;color:var(--navy);margin-bottom:4px">우리 관계를 지키는 규칙 3가지</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.6">두 사람의 기질과 가치관 차이를 바탕으로 제안해요</div>
+    </div>
+    <div id="c-rules-list"></div>
+    <!-- CTA -->
+    <div class="cta-section">
+      <button class="cta-talk-btn" onclick="rcScrollTo('rcs-talk',document.querySelector('#rc-tabs .rcstab:nth-child(2)'))">
+        💬 대화 주제로 돌아가기
+      </button>
+      <button class="cta-share-btn" id="c-share-btn" onclick="alert('커플 MRI 결과를 공유하세요! 우리 결혼 전 꼭 해봐! 🧬')">
+        📤 카카오톡으로 결과 공유하기
+      </button>
+    </div>
+    <div class="rc-card" style="margin-top:0">
+      <div class="upgrade-card" style="margin:0;border-radius:14px">
+        <div class="uc-tag">🔥 기혼 버전 예정</div>
+        <div class="uc-title">결혼 후 갈등 패턴 진단도 해보세요</div>
+        <div class="uc-desc">커플 MRI에서 발견된 갈등 루프를 결혼 후 실생활에서 어떻게 다룰지 심층 분석해드려요.</div>
+        <button class="uc-btn" onclick="resetAll()">🔄 처음부터 다시하기</button>
+      </div>
+    </div>
+  </div>
+  <div style="height:30px"></div>
+</div>
+
+
+
+</div><!-- /phone -->
+
+<script>
+// ═══════════════════════════════════════════════════════
+// DATA: 기질/성향 20문항 (TQS)
+// ═══════════════════════════════════════════════════════
+const TQS = [
+  // H축 - 감정 반응성 (1~3번)
+  {n:1, axis:'H', cls:'lk-h', text:'별거 아닌 말도 하루 종일 신경 쓰일 때가 있다.', rev:false},
+  {n:2, axis:'H', cls:'lk-h', text:'서운한 일이 생기면 생각이 쉽게 멈추지 않는다.', rev:false},
+  {n:3, axis:'H', cls:'lk-h', text:'말다툼이 시작되면 감정이 빨리 올라오는 편이다.', rev:false},
+  // H축 - 정서 표현 강도 (4~6번)
+  {n:4, axis:'H', cls:'lk-h', text:'속상한 마음은 비교적 바로 말로 꺼내는 편이다.', rev:false},
+  {n:5, axis:'H', cls:'lk-h', text:'내가 느끼는 감정을 말로 설명하는 게 어렵지 않다.', rev:false},
+  {n:6, axis:'H', cls:'lk-h', text:'마음에 걸리는 일은 혼자 생각하며 정리하는 편이다.', rev:true},
+  // P축 - 추격 성향 (7~10번)
+  {n:7, axis:'P', cls:'lk-p', text:'다툼이 생기면 그날 안에라도 풀고 싶다.', rev:false},
+  {n:8, axis:'P', cls:'lk-p', text:'문제가 생기면 미루기보다 바로 이야기하는 편이다.', rev:false},
+  {n:9, axis:'P', cls:'lk-p', text:'침묵이 길어지면 괜히 더 불안해진다.', rev:false},
+  {n:10, axis:'P', cls:'lk-p', text:'갈등을 그냥 넘기는 게 더 힘들게 느껴진다.', rev:false},
+  // P축 - 회피 성향 (11~14번)
+  {n:11, axis:'P', cls:'lk-p', text:'다툼이 시작되면 상황이 빨리 지나가길 바라는 편이다.', rev:false},
+  {n:12, axis:'P', cls:'lk-p', text:'불편한 대화는 오래 이어지지 않았으면 좋겠다.', rev:false},
+  {n:13, axis:'P', cls:'lk-p', text:'감정이 격해지면 말을 줄이게 된다.', rev:false},
+  {n:14, axis:'P', cls:'lk-p', text:'시간이 조금 지나면 대부분 괜찮아질 거라 생각하는 편이다.', rev:false},
+  // S축 - 불안 애착 (15~17번)
+  {n:15, axis:'S', cls:'lk-s', text:'상대의 말투나 분위기가 달라지면 마음이 쓰인다.', rev:false},
+  {n:16, axis:'S', cls:'lk-s', text:'관계가 멀어질까 걱정해본 적이 있다.', rev:false},
+  {n:17, axis:'S', cls:'lk-s', text:'다툰 뒤 괜히 관계가 어색해질까 신경이 쓰인다.', rev:false},
+  // B축 - 결합 지향성 (18~20번)
+  {n:18, axis:'B', cls:'lk-b', text:'중요한 일은 혼자보다 함께 상의하는 게 편하다.', rev:false},
+  {n:19, axis:'B', cls:'lk-b', text:'함께 보내는 시간이 자연스럽게 우선순위가 되는 편이다.', rev:false},
+  {n:20, axis:'B', cls:'lk-b', text:'관계 속에서도 나만의 공간은 꼭 필요하다고 느낀다.', rev:true},
+];
+
+// ═══════════════════════════════════════════════════════
+// DATA: 결혼가치관 20문항 (VQS)
+// ═══════════════════════════════════════════════════════
+const VQS = [
+  // ▌ 원가족 경계 (1~5)
+  {n:1, domain:'원가족 경계', color:'#6C3483',
+   text:'명절(설·추석)은 어떻게 보내야 한다고 생각하세요?',
+   opts:['양가를 교대로 방문','각자의 원가족과 따로','부부만의 시간을 우선','상황에 따라 유연하게']},
+  {n:2, domain:'원가족 경계', color:'#6C3483',
+   text:'부모님과의 연락·방문 빈도는 어느 정도가 적절하다고 생각하세요?',
+   opts:['거의 매일 연락·주 1회 방문','주 1~2회 연락·월 1~2회 방문','월 1~2회 연락·명절에 방문','필요할 때만 연락·방문']},
+  {n:3, domain:'원가족 경계', color:'#6C3483',
+   text:'부모님이 부부의 결정에 의견을 주신다면?',
+   opts:['적극 수렴하고 함께 결정','의견은 듣되 최종은 부부','부부 결정 영역은 개입 없음']},
+  {n:4, domain:'원가족 경계', color:'#6C3483',
+   text:'결혼 후 부모님에 대한 경제적 지원(용돈·의료비)은?',
+   opts:['정기적으로 드리는 것이 당연','상황이 허락할 때 드린다','부부 합의 하에 금액·방식을 정한다','부모님 각자가 스스로 해결']},
+  {n:5, domain:'원가족 경계', color:'#6C3483',
+   text:'결혼 후 부모님과의 거주 거리는?',
+   opts:['가까울수록 좋다 (30분 이내)','적당한 거리 (1시간 내외)','독립적 거리 (1시간 이상)','거리보다 왕래 빈도가 중요']},
+  // ▌ 경제관 (6~9)
+  {n:6, domain:'경제관', color:'#1A5276',
+   text:'결혼 후 가계 재정은 어떻게 관리하는 것이 맞다고 생각하세요?',
+   opts:['완전 통합 (공동 계좌)','생활비 공동·용돈은 따로','일정액 공동 납입·나머지 개인','완전 분리 (각자 담당)']},
+  {n:7, domain:'경제관', color:'#1A5276',
+   text:'큰 지출(가전·여행·인테리어)을 결정할 때는?',
+   opts:['반드시 둘이 함께 상의','일정 금액 이상은 함께','각자 담당 영역에서 자유롭게']},
+  {n:8, domain:'경제관', color:'#1A5276',
+   text:'결혼 후 재정 우선순위는 무엇이어야 한다고 생각하세요?',
+   opts:['내 집 마련 저축이 최우선','현재 생활의 질과 저축 균형','투자를 통한 자산 증식 우선','지금 잘 살고 미래는 그때']},
+  {n:9, domain:'경제관', color:'#1A5276',
+   text:'부부 중 한 명이 경력 단절이 생긴다면 생활비는?',
+   opts:['버는 사람이 전부 책임','줄어든 수입에 맞춰 함께 조정','미리 함께 충분히 모아둔다','각자 저축으로 각자 해결']},
+  // ▌ 가사/역할 (10~13)
+  {n:10, domain:'가사/역할', color:'#1E8449',
+   text:'결혼 후 가사(청소·요리·빨래)는 어떻게 나눠야 한다고 생각하세요?',
+   opts:['능력·상황에 따라 유연하게','역할 정해두고 각자 책임','시간이 많은 사람이 더','수입 무관하게 완전 반반']},
+  {n:11, domain:'가사/역할', color:'#1E8449',
+   text:'맞벌이 상황에서 가사 분담은?',
+   opts:['수입에 비례해서 분담','수입 무관하게 50:50','더 여유 있는 사람이 더','외부 도움 (가사도우미) 적극 활용']},
+  {n:12, domain:'가사/역할', color:'#1E8449',
+   text:'부부의 식사(평일 저녁·주말)는 기본적으로 어떻게 해결해야 한다고 생각하세요?',
+   opts:['집에서 직접 만들어 먹는 게 기본','외식·배달·집밥 자유롭게 섞는다','요리 잘하는 쪽이 담당','식사 방식에 특별한 기준 없음']},
+  {n:13, domain:'가사/역할', color:'#1E8449',
+   text:'결혼 후 커리어(직장)에 대해 어떻게 생각하세요?',
+   opts:['두 사람 모두 커리어 유지가 당연','자녀 출산 시 일시적으로 쉬어도 OK','가정 안정 후 전업도 가능','상황에 따라 유연하게']},
+  // ▌ 삶의 우선순위 (14~17)
+  {n:14, domain:'삶의 우선순위', color:'#784212',
+   text:'결혼 후 개인 시간(취미·친구 만남)은 어느 정도가 적절하다고 생각하세요?',
+   opts:['주말 대부분은 둘이 함께','함께·개인 시간을 균형있게','개인 시간은 충분히 보장되어야','시기에 따라 유연하게 조정']},
+  {n:15, domain:'삶의 우선순위', color:'#784212',
+   text:'결혼 후 결혼 전 친구들과의 관계는 어떻게 되어야 한다고 생각하세요?',
+   opts:['부부가 함께하는 모임 우선','개인 친구 관계는 독립적 유지','배우자와 친구를 적극 소개·어울림','자연스럽게 정리되어도 OK']},
+  {n:16, domain:'삶의 우선순위', color:'#784212',
+   text:'결혼 생활에서 가장 중요한 것은 무엇이라고 생각하세요?',
+   opts:['가족(부부·자녀)이 최우선','커리어와 가족 사이의 균형','경제적 안정이 모든 것의 기반','개인 성장과 행복이 있어야 가족도 행복']},
+  {n:17, domain:'삶의 우선순위', color:'#784212',
+   text:'결혼 후 부부만의 여행·외출은 어느 정도가 적절하다고 생각하세요?',
+   opts:['월 1회 이상 함께 외출·데이트 필요','분기 한 번 정도면 충분','특별한 기념일 위주로 챙김','자연스럽게 생기면 된다']},
+  // ▌ 자녀/미래 (18~20)
+  {n:18, domain:'자녀/미래', color:'#1A5276',
+   text:'자녀 계획에 대해 어떻게 생각하세요?',
+   opts:['결혼 후 되도록 빨리 갖고 싶다','충분히 둘만의 시간 후 갖고 싶다','원하면 갖고, 아니면 안 낳아도 된다','현재는 자녀 계획이 없다']},
+  {n:19, domain:'자녀/미래', color:'#1A5276',
+   text:'자녀 양육 방식에 대해 어떤 생각을 가지고 있나요?',
+   opts:['부모 중 한 명이 전담 케어','두 사람이 동등하게 육아 분담','조부모(양가) 도움 적극 활용','육아도우미·어린이집 등 외부 활용']},
+  {n:20, domain:'자녀/미래', color:'#1A5276',
+   text:'결혼 후 5~10년 안에 가장 이루고 싶은 것은 무엇인가요?',
+   opts:['내 집 마련','안정적 수입과 생활 기반 확보','자녀를 낳고 가정 꾸리기','다양한 경험(여행·문화) 함께','각자의 커리어 성장']},
+];
+
+// ═══════════════════════════════════════════════════════
+// DATA: 9가지 PHBS 유형 맵
+// ═══════════════════════════════════════════════════════
+const TYPE_MAP = {
+  'pursuer-hot': {
+    emoji:'🔥', name:'정열 탐색자', tags:['추격형','감정고온','즉각해결'],
+    desc:'갈등이 생기면 그 자리에서 즉시 풀고 싶어합니다. 감정이 강렬하고 표현이 풍부해 파트너와 깊은 대화를 원하는 유형입니다.',
+    insight:'감정 표현이 풍부한 만큼, 상대가 처리할 시간을 주는 것이 핵심입니다.',
+    rel:'갈등을 즉시 해결하려는 강한 의지로 관계에 적극적으로 투자합니다. 파트너가 느끼는 감정을 잘 인식하고 공감합니다.',
+    conflict:'갈등 상황에서 해결을 적극 추구하며 대화를 요청합니다. 침묵이나 회피를 보이는 파트너에게 더 강하게 다가가는 경향이 있습니다.',
+    str:['적극적 소통 능력','강한 관계 회복 의지'],
+    gro:['감정 과부하 시 잠시 멈추는 연습','파트너 처리 속도 존중하기'],
+    w1:['추격-회피 갈등 루프 주의','파트너가 회피형일 때 반복 갈등 패턴이 생길 수 있습니다.'],
+    w2:['감정 과부하 관리','갈등 중 감정이 빠르게 올라오므로 잠시 멈추는 연습이 필요합니다.'],
+    w3:['이것이 강점입니다','관계에 헌신하는 모습은 파트너에게 신뢰와 안정감을 줍니다.'],
+    loop:'추격-회피 갈등 루프 위험도 높음 (파트너가 회피형일 경우)',
+    danger:'"해결하지 않으면 못 배기는" 강박이 파트너를 짓누릅니다',
+    dangerDetail:'갈등이 생기면 즉시 해결하려는 욕구가 폭발합니다. 파트너가 침묵하거나 회피할수록 더 강하게 다가가는 추격-회피 루프에 빠질 수 있어요. 이 루프가 반복되면 파트너는 점점 더 멀어지고, 나는 더 불안해지는 악순환이 됩니다.',
+    action:'"10분만 기다려줘"라고 말하고 실제로 10분 기다리기'
+  },
+  'pursuer-warm': {
+    emoji:'💬', name:'따뜻한 소통자', tags:['추격형','감정중온','적극대화'],
+    desc:'갈등을 회피하지 않고 적극 대화로 풀어갑니다. 감정과 이성의 균형이 잡혀 건강한 갈등 해결 능력을 가진 유형입니다.',
+    insight:'대화를 통한 관계 개선에 강점이 있습니다. 타이밍을 잘 선택하면 더욱 효과적입니다.',
+    rel:'따뜻하고 적극적인 소통으로 관계를 이끌어 갑니다. 갈등 상황에서도 연결감을 유지하려 노력합니다.',
+    conflict:'갈등 상황에서 차분하게 대화를 요청하며 해결책을 찾습니다. 상대의 감정도 배려하면서 문제를 풀어가는 편입니다.',
+    str:['갈등 직면 능력','균형 잡힌 감정 표현'],
+    gro:['상대의 준비 여부 먼저 확인하기','대화 타이밍 조율하는 습관'],
+    w1:['압박감 형성 주의','갈등 해결 욕구가 상대에게 압박감으로 느껴질 수 있습니다.'],
+    w2:['상대 페이스 존중','해결하고 싶은 마음은 자연스럽지만 상대의 준비 여부를 먼저 확인하세요.'],
+    w3:['강점을 살려요','적극적인 소통 의지는 건강한 관계의 가장 중요한 자원입니다.'],
+    loop:'파트너 유형에 따라 압박감 형성 가능',
+    danger:'해결 욕구가 상대에게 "대화 압박"으로 느껴질 수 있습니다',
+    dangerDetail:'갈등을 풀고 싶은 마음이 강한 나머지, 상대가 준비되지 않은 타이밍에도 대화를 요청하게 됩니다. 이것이 반복되면 파트너는 대화 자체를 부담스럽게 느끼기 시작해요.',
+    action:'"지금 이야기할 수 있어?" 한 마디 먼저 확인하기'
+  },
+  'pursuer-cool': {
+    emoji:'🎯', name:'논리적 해결자', tags:['추격형','감정저온','이성접근'],
+    desc:'갈등은 즉시 해결해야 하지만 감정보다 논리로 접근합니다. 차분하게 문제를 분석하고 해결책을 찾는 유형입니다.',
+    insight:'감정 표현이 적어 파트너가 차갑다고 느낄 수 있습니다. 감정도 함께 전달하는 연습이 필요합니다.',
+    rel:'이성적이고 체계적으로 관계 문제를 해결하려 합니다.',
+    conflict:'갈등이 생기면 원인을 분석하고 해결책을 제시하는 방식을 선호합니다. 감정적 대화보다 실질적 해결을 원합니다.',
+    str:['냉철한 문제 해결 능력','체계적인 갈등 접근'],
+    gro:['감정 언어 표현 연습','파트너의 감정적 필요 인식하기'],
+    w1:['감정 공유 부족 주의','감정 표현이 적으면 파트너가 거리감을 느낄 수 있습니다.'],
+    w2:['감정도 함께 전달하기','논리적 해결책과 함께 "나는 이래서 걱정돼"라는 감정 표현을 더해보세요.'],
+    w3:['냉정함이 강점','위기 상황에서 흔들리지 않는 차분함은 파트너에게 큰 안정감을 줍니다.'],
+    loop:'감정 교류 부족으로 관계 냉각 가능',
+    danger:'논리로 설득하려다 파트너의 감정을 놓칩니다',
+    dangerDetail:'갈등 상황에서 원인 분석과 해결책 제시에 집중하다 보면 파트너가 원하는 "공감받는 느낌"을 주지 못합니다. 파트너는 해결책보다 먼저 이해받고 싶어할 수 있어요.',
+    action:'해결책 말하기 전에 "많이 힘들었겠다" 한 마디 먼저'
+  },
+  'flexible-hot': {
+    emoji:'🌈', name:'감성 조율자', tags:['유연형','감정고온','상황적응'],
+    desc:'상황에 따라 유연하게 대처하면서 감정이 풍부한 유형입니다. 파트너의 감정 상태를 잘 읽고 분위기에 맞게 반응합니다.',
+    insight:'감정 공명 능력이 뛰어납니다. 자신의 경계를 명확히 하는 것이 장기 관계에 도움이 됩니다.',
+    rel:'파트너의 감정 상태에 예민하게 반응하며 분위기를 맞춰줍니다.',
+    conflict:'상황에 따라 추격과 회피를 유연하게 조합하며 대처합니다. 감정이 강렬하게 올라올 때 잠시 조절이 필요합니다.',
+    str:['뛰어난 감정 공감 능력','유연한 상황 대처'],
+    gro:['자신의 감정적 필요 명확히 표현하기','번아웃 방지 위한 경계 설정'],
+    w1:['감정 소진 주의','파트너 감정에 과도하게 몰입하면 자신이 소진될 수 있습니다.'],
+    w2:['나의 필요도 중요해요','파트너를 배려하는 만큼 자신의 감정적 필요도 표현해주세요.'],
+    w3:['공감 능력이 최고의 강점','파트너의 감정을 잘 읽는 능력은 관계에서 가장 소중한 자산입니다.'],
+    loop:'감정 과부하 시 번아웃 위험',
+    danger:'파트너 감정에 너무 몰입해 나 자신을 잃습니다',
+    dangerDetail:'상대의 감정 상태를 지나치게 흡수하다 보면 내 감정과 필요를 표현하지 못하게 됩니다. 결국 쌓인 감정이 예상치 못한 순간에 터질 수 있어요.',
+    action:'하루에 한 번 "나는 지금 어떤 감정인가" 스스로 확인하기'
+  },
+  'flexible-warm': {
+    emoji:'⚖️', name:'안정적 동반자', tags:['유연형','감정중온','균형형'],
+    desc:'갈등에 융통성 있게 대처하며 감정도 안정적입니다. 어떤 유형의 파트너와도 건강한 관계를 만들 수 있는 유형입니다.',
+    insight:'가장 건강한 패턴에 가깝습니다. 파트너의 갈등 방식을 이해하고 맞춰주는 능력을 최대한 활용하세요.',
+    rel:'안정적이고 유연한 태도로 관계를 이끌어 갑니다. 갈등에서도 중심을 잃지 않습니다.',
+    conflict:'상황에 맞게 유연하게 갈등을 다루며, 감정과 이성을 균형있게 사용합니다.',
+    str:['갈등 유연성','감정적 안정성'],
+    gro:['자신의 필요를 더 명확히 표현하기','갈등 회피 성향이 생기지 않도록 주기적 점검'],
+    w1:['자기 필요 표현 연습','너무 유연하게 맞추다 보면 자신의 필요를 표현하지 않게 될 수 있습니다.'],
+    w2:['주기적 감정 나눔 시간 마련','정기적으로 관계를 점검하는 시간을 가져보세요.'],
+    w3:['최고의 파트너 유형','균형 잡힌 당신은 어떤 유형의 파트너와도 안정적인 관계를 만들 수 있습니다.'],
+    loop:'갈등 회피로 감정 누적 가능',
+    danger:'너무 맞춰주다 보면 정작 내 불만이 누적됩니다',
+    dangerDetail:'어떤 상황에서도 유연하게 대처하는 장점이 있지만, 이것이 지나치면 내 필요와 불만을 표현하지 않게 됩니다. 어느 날 갑자기 "왜 내 얘기는 안 들어줘?"라는 식의 폭발이 올 수 있어요.',
+    action:'주 1회 "내가 요즘 아쉬운 것" 파트너에게 솔직히 말하기'
+  },
+  'flexible-cool': {
+    emoji:'🌊', name:'차분한 중재자', tags:['유연형','감정저온','이성균형'],
+    desc:'상황을 차분히 읽고 이성적으로 대처합니다. 갈등에서 흥분하지 않고 중립을 유지하는 유형입니다.',
+    insight:'갈등 중재에 능합니다. 감정 표현을 늘리면 파트너와의 감정적 연결이 더 깊어집니다.',
+    rel:'차분하고 이성적인 태도로 갈등을 중재하는 역할을 자연스럽게 맡습니다.',
+    conflict:'감정적으로 흔들리지 않고 차분하게 상황을 파악하며 해결책을 모색합니다.',
+    str:['냉정한 판단력','갈등 중재 능력'],
+    gro:['감정 표현 증가시키기','파트너의 감정 신호 적극 인식하기'],
+    w1:['감정 공유 부족 주의','감정 표현이 적어 파트너가 거리감을 느낄 수 있습니다.'],
+    w2:['감정도 표현해주세요','"나도 이 상황이 편하지 않아"처럼 작은 감정 표현이 관계를 더 가깝게 합니다.'],
+    w3:['안정감이 최고의 강점','갈등 상황에서 흔들리지 않는 차분함은 파트너에게 큰 안정감을 줍니다.'],
+    loop:'감정 공유 부족으로 친밀감 저하 가능',
+    danger:'중립을 유지하다 파트너가 "나한테 관심 없다"고 느낍니다',
+    dangerDetail:'갈등 상황에서 차분하고 이성적인 것은 강점이지만, 감정 표현이 너무 적으면 파트너는 내가 관계에 무관심하다고 느낄 수 있습니다.',
+    action:'갈등 후 한 마디: "나도 이 상황이 편하지 않아"'
+  },
+  'distancer-hot': {
+    emoji:'🌙', name:'내면 탐구자', tags:['회피형','감정고온','내성적'],
+    desc:'갈등이 생기면 혼자 처리하고 싶으면서도 내면은 감정이 풍부합니다. 혼자 깊이 고민한 후 대화를 원하는 유형입니다.',
+    insight:'감정은 풍부하지만 표현을 꺼리는 경향이 있습니다. 파트너에게 "잠깐 정리할 시간이 필요해"라고 알려주세요.',
+    rel:'깊은 내면 세계를 가지고 있으며 관계에서 깊이 있는 연결을 원합니다.',
+    conflict:'갈등 시 내면에서는 감정이 강하게 올라오지만, 표현보다는 혼자 처리하려 합니다. 파트너에게 침묵처럼 보일 수 있습니다.',
+    str:['깊은 내면 성찰','신중한 판단력'],
+    gro:['처리 시간 필요하다고 파트너에게 명확히 전달하기','"잠깐 생각 정리 후 말할게" 연습'],
+    w1:['추격-회피 루프 주의','파트너가 추격형일 때 반복 갈등 패턴이 생길 수 있습니다.'],
+    w2:['복귀 시간 알려주기','침묵하기 전 "저녁에 이야기하자"처럼 구체적으로 알려주세요.'],
+    w3:['깊이 있는 사람이에요','진지하게 관계를 생각하는 당신의 태도는 파트너에게 신뢰를 줍니다.'],
+    loop:'추격-회피 갈등 루프 위험도 높음 (파트너가 추격형일 경우)',
+    danger:'침묵으로 사라지는데, 내면은 폭풍처럼 혼란스럽습니다',
+    dangerDetail:'갈등이 생기면 겉으로는 조용히 물러나지만 내면에서는 강한 감정이 요동칩니다. 파트너는 내 침묵을 "무시" 또는 "포기"로 오해하고, 더 강하게 다가오면서 추격-회피 루프가 시작됩니다.',
+    action:'사라지기 전에 "잠깐 정리 필요해, 저녁 7시에 이야기하자" 한 마디'
+  },
+  'distancer-warm': {
+    emoji:'🏔️', name:'신중한 독립자', tags:['회피형','감정중온','독립적'],
+    desc:'시간을 두고 상황을 정리하는 것을 선호하며 감정은 균형 있게 유지합니다. 독립적이면서도 안정적인 관계를 원하는 유형입니다.',
+    insight:'"오늘 저녁에 이야기하자"처럼 복귀 시간을 알려주세요.',
+    rel:'독립적이고 신중한 태도로 관계를 유지합니다. 깊은 신뢰가 생기면 감정도 잘 공유합니다.',
+    conflict:'갈등 시 즉각적 대응보다 충분히 생각한 후 대화하는 방식을 선호합니다.',
+    str:['독립성과 안정감','신중한 의사결정'],
+    gro:['갈등 후 복귀 타이밍 파트너에게 명확히 알리기','감정 공유 연습'],
+    w1:['침묵 오해 주의','파트너가 당신의 침묵을 거절이나 무관심으로 오해할 수 있습니다.'],
+    w2:['복귀 약속이 관계를 살려요','"내일 얘기하자"처럼 구체적인 복귀 약속이 파트너의 불안을 줄입니다.'],
+    w3:['신중함이 강점','충분히 생각하고 내린 결정은 관계에 안정감을 줍니다.'],
+    loop:'침묵이 길어지면 파트너의 불안 증폭 가능',
+    danger:'침묵이 길어질수록 파트너의 불안이 커집니다',
+    dangerDetail:'갈등 후 혼자 정리하는 시간이 필요하다는 것은 자연스럽습니다. 하지만 파트너에게 언제 돌아올지 알려주지 않으면, 그 침묵이 파트너의 불안을 계속 자극합니다.',
+    action:'"내일 저녁에 이야기하자" 구체적인 복귀 약속 꼭 남기기'
+  },
+  'distancer-cool': {
+    emoji:'🍃', name:'평온한 거리두기', tags:['회피형','감정저온','시간해결'],
+    desc:'갈등을 시간이 해결해줄 것이라 믿으며 감정 반응도 적은 유형입니다. 표면적 평화를 유지하지만 감정이 누적될 수 있습니다.',
+    insight:'갈등을 덮어두면 결국 더 큰 문제가 됩니다. 작은 불편함도 표현하는 연습이 관계 건강에 중요합니다.',
+    rel:'평온하고 차분한 태도로 관계를 유지합니다. 큰 갈등을 회피하며 표면적 안정을 선호합니다.',
+    conflict:'갈등이 생기면 자연스럽게 지나가길 기다리는 편입니다.',
+    str:['감정적 안정감','침착함과 평화 유지'],
+    gro:['작은 불편함도 조기에 표현하기','파트너의 갈등 신호 적극 인식하기'],
+    w1:['감정 누적 주의','갈등을 덮어두면 나중에 더 큰 폭발로 이어질 수 있습니다.'],
+    w2:['작은 것부터 표현해보기','"이거 조금 불편해"처럼 작은 감정 표현이 큰 갈등을 예방합니다.'],
+    w3:['평온함이 강점','감정적으로 흔들리지 않는 당신의 침착함은 관계의 안전망이 됩니다.'],
+    loop:'표면적 평화 뒤 내면 불만 누적 위험',
+    danger:'시간이 해결해줄 거라 믿다가 감정이 쌓여 폭발합니다',
+    dangerDetail:'작은 불편함을 표현하지 않고 지나치다 보면 속에서 차곡차곡 쌓입니다. 어느 날 평소와 다름없는 일에 갑자기 크게 반응하게 되고, 파트너는 영문을 모른 채 당황하게 됩니다.',
+    action:'불편한 것 생기면 그날 안에 "이거 좀 불편해" 한 마디 하기'
+  },
+};
+
+// ═══════════════════════════════════════════════════════
+// DATA: 프리셋 파트너 (시뮬레이션용)
+// ═══════════════════════════════════════════════════════
+const PARTNER_PRESETS = [
+  {
+    name:'다은', emoji:'💜', pType:'distancer', hType:'warm',
+    phbs:{pursue:9, avoid:15, h:20, b:10, s:11},
+    vals:{0:1,1:2,2:1,3:2,4:1, 5:0,6:0,7:1,8:1, 9:0,10:2,11:1,12:1, 13:1,14:1,15:3,16:0, 17:1,18:1,19:2}
+  },
+  {
+    name:'준서', emoji:'💙', pType:'flexible', hType:'warm',
+    phbs:{pursue:13, avoid:11, h:18, b:12, s:8},
+    vals:{0:0,1:1,2:1,3:2,4:1, 5:1,6:0,7:1,8:2, 9:0,10:1,11:1,12:3, 13:1,14:1,15:0,16:0, 17:1,18:1,19:0}
+  },
+];
+
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+let tIdx=0, tAns={};
+let vIdx=0, vAns={};
+// ═══════════════════════════════════════════════════════
+// SUPABASE 초기화
+// ═══════════════════════════════════════════════════════
+const SUPABASE_URL = 'https://qnhgiehgelpjvtmtxbcj.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_sw8pWT89yeZHKchyg7W51g_FHzh3zny';
+let _sb = null;
+function getSB() {
+  if (!_sb) _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  return _sb;
+}
+
+let myPhbs=null, myVals=null;
+let partnerPhbs=null, partnerVals=null, partnerInfo=null;
+
+// B 모드 전역 변수
+let sessionCode = null;
+let isBMode = false;
+let waitInterval = null;
+
+// ═══════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════
+function goScreen(id) {
+  document.querySelectorAll('.scr').forEach(s=>s.classList.remove('on'));
+  const el = document.getElementById(id);
+  if(el){ el.classList.add('on'); el.scrollTop=0; }
+}
+
+function startSurvey() {
+  tIdx=0; tAns={};
+  renderTQ();
+  goScreen('s-st');
+}
+
+function resetAll() {
+  tIdx=0; tAns={}; vIdx=0; vAns={};
+  myPhbs=null; myVals=null; partnerPhbs=null; partnerVals=null; partnerInfo=null;
+  goScreen('s-land');
+}
+
+// ═══════════════════════════════════════════════════════
+// 기질 설문
+// ═══════════════════════════════════════════════════════
+function renderTQ() {
+  const q = TQS[tIdx];
+  const pct = Math.max(5, Math.round((tIdx/20)*100));
+  document.getElementById('st-prog').style.width = pct+'%';
+  document.getElementById('st-ptxt').textContent = `${tIdx+1} / 20`;
+
+  const axColors = {H:'var(--col-h)',P:'var(--col-p)',S:'var(--col-s)',B:'var(--col-b)'};
+  const axLabels = {H:'H축 · 감정 온도',P:'P축 · 추격-회피',S:'S축 · 관계 안정성',B:'B축 · 결합 지향성'};
+  const col = axColors[q.axis];
+
+  document.getElementById('st-body').innerHTML = `
+    <div class="q-card">
+      <div class="q-num" style="color:${col}">Q${tIdx+1}</div>
+      <div class="q-axis-tag" style="background:${col}20;color:${col}">${axLabels[q.axis]}</div>
+      <div class="q-text">${q.text}</div>
+      <div class="likert" id="lk-row">
+        ${[1,2,3,4,5].map(v=>`<button class="lk-btn ${q.cls}" onclick="pickT(${v})">${v}</button>`).join('')}
+      </div>
+      <div class="lk-labels"><span>전혀 아님</span><span>매우 그러함</span></div>
+    </div>
+    <div style="height:24px"></div>`;
+  document.getElementById('s-st').querySelector('.sv-body').scrollTop=0;
+}
+
+function pickT(val) {
+  document.querySelectorAll('#lk-row .lk-btn').forEach((b,i)=>{
+    b.classList.toggle('on', i===val-1);
+    b.style.pointerEvents='none';
+  });
+  tAns[tIdx] = val;
+  setTimeout(()=>{
+    tIdx++;
+    if(tIdx < TQS.length){ renderTQ(); }
+    else {
+      // 기질 완료 → 가치관 설문
+      vIdx=0; vAns={};
+      renderVQ();
+      goScreen('s-sv');
+    }
+  }, 280);
+}
+
+// ═══════════════════════════════════════════════════════
+// 가치관 설문
+// ═══════════════════════════════════════════════════════
+function renderVQ() {
+  const q = VQS[vIdx];
+  const pct = Math.max(5, Math.round((vIdx/20)*100));
+  document.getElementById('sv-prog').style.width = pct+'%';
+  document.getElementById('sv-ptxt').textContent = `${vIdx+1} / 20`;
+
+  document.getElementById('sv-body').innerHTML = `
+    <div class="vq-card">
+      <div class="vq-domain" style="background:${q.color}20;color:${q.color}">📍 ${q.domain}</div>
+      <div class="vq-text">${q.text}</div>
+      <div class="vq-opts">
+        ${q.opts.map((opt,i)=>`
+          <div class="vq-opt" onclick="pickV(${i})" id="vopt-${i}">
+            <span class="vq-badge">${String.fromCharCode(65+i)}</span>
+            <span class="vq-opt-text">${opt}</span>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div style="height:24px"></div>`;
+  document.getElementById('s-sv').querySelector('.sv-body').scrollTop=0;
+}
+
+function pickV(idx) {
+  document.querySelectorAll('.vq-opt').forEach(el=>el.style.pointerEvents='none');
+  const chosen = document.getElementById('vopt-'+idx);
+  if(chosen) chosen.classList.add('on');
+  vAns[vIdx] = idx;
+  setTimeout(()=>{
+    vIdx++;
+    if(vIdx < VQS.length){ renderVQ(); }
+    else {
+      // 가치관 완료 → 로딩 → 개인 MRI 결과
+      goScreen('s-proc1');
+      calcAndShowPersonal();
+    }
+  }, 350);
+}
+
+// ═══════════════════════════════════════════════════════
+// PHBS 채점
+// ═══════════════════════════════════════════════════════
+function scorePhbs(ans) {
+  const r = v => 6 - (v||3);
+  const g = i => ans[i]||3;
+  // H축: Q1~Q6 (idx 0~5), Q6(idx5) 역문항
+  const h = g(0)+g(1)+g(2)+g(3)+g(4)+r(ans[5]);
+  // P축 추격: Q7~Q10 (idx 6~9)
+  const pursue = g(6)+g(7)+g(8)+g(9);
+  // P축 회피: Q11~Q14 (idx 10~13)
+  const avoid = g(10)+g(11)+g(12)+g(13);
+  // S축: Q15~Q17 (idx 14~16)
+  const s = g(14)+g(15)+g(16);
+  // B축: Q18~Q19 (idx 17~18) + Q20(idx19) 역문항
+  const b = g(17)+g(18)+r(ans[19]);
+  return {pursue, avoid, h, b, s};
+}
+
+function getPType(phbs) {
+  const d = phbs.pursue - phbs.avoid;
+  if(d >= 4) return 'pursuer';
+  if(d <= -4) return 'distancer';
+  return 'flexible';
+}
+
+function getHType(phbs) {
+  if(phbs.h >= 22) return 'hot';
+  if(phbs.h >= 16) return 'warm';
+  return 'cool';
+}
+
+function getTypeKey(phbs) { return getPType(phbs)+'-'+getHType(phbs); }
+
+// ═══════════════════════════════════════════════════════
+// 개인 결과 계산 및 화면 전환
+// ═══════════════════════════════════════════════════════
+async function calcAndShowPersonal() {
+  myPhbs = scorePhbs(tAns);
+  myVals = Object.assign({}, vAns);
+
+  if (isBMode) {
+    // B 모드: Supabase에 B 결과 저장 후 커플 MRI 바로 오픈
+    await saveSessionB();
+    setTimeout(()=>{
+      renderCoupleResult();
+      goScreen('s-proc2');
+      setTimeout(()=>{
+        goScreen('s-rc');
+        setTimeout(()=>{ animateRcBars(); initRcScroll(); }, 400);
+      }, 2200);
+    }, 100);
+  } else {
+    // A 모드: Supabase에 A 결과 저장 후 개인 MRI 표시
+    await saveSessionA();
+    setTimeout(()=>{
+      renderPersonal();
+      goScreen('s-rp');
+      setTimeout(()=>{ animateRpBars(); initRpScroll(); }, 400);
+    }, 2200);
+  }
+}
+
+// A 세션 생성
+async function saveSessionA() {
+  try {
+    const sb = getSB();
+    const { data, error } = await sb
+      .from('couple_sessions')
+      .insert({ a_phbs: myPhbs, a_values: myVals, status: 'waiting' })
+      .select().single();
+    if (error) throw error;
+    sessionCode = data.code;
+    updateInviteLink();
+  } catch(e) {
+    console.error('A 세션 저장 오류:', e);
+    // 오프라인 fallback: 랜덤 코드로 계속 진행
+    sessionCode = Math.random().toString(36).substr(2,8).toUpperCase();
+  }
+}
+
+// B 세션 업데이트
+async function saveSessionB() {
+  try {
+    const sb = getSB();
+    const { error } = await sb
+      .from('couple_sessions')
+      .update({ b_phbs: myPhbs, b_values: myVals, status: 'complete' })
+      .eq('code', sessionCode);
+    if (error) throw error;
+  } catch(e) {
+    console.error('B 데이터 저장 오류:', e);
+  }
+}
+
+// 초대 링크 UI 업데이트
+function updateInviteLink() {
+  const base = window.location.href.split('?')[0];
+  const link = base + '?code=' + sessionCode;
+  const el = document.getElementById('invite-link-url');
+  if (el) el.textContent = link;
+  const btn = document.getElementById('invite-copy-btn');
+  if (btn) btn.dataset.link = link;
+}
+
+// 링크 복사
+function copyInviteLink() {
+  const btn = document.getElementById('invite-copy-btn');
+  const link = btn ? btn.dataset.link : (window.location.href.split('?')[0] + '?code=' + sessionCode);
+  navigator.clipboard.writeText(link).then(()=>{
+    const orig = btn.textContent;
+    btn.textContent = '✅ 복사됨!';
+    setTimeout(()=>{ btn.textContent = orig; }, 1500);
+  }).catch(()=>{ prompt('아래 링크를 복사하세요:', link); });
+}
+
+function copyWaitLink() {
+  const base = window.location.href.split('?')[0];
+  const link = base + '?code=' + sessionCode;
+  navigator.clipboard.writeText(link).catch(()=>{ prompt('링크 복사:', link); });
+}
+
+function shareKakao() {
+  const base = window.location.href.split('?')[0];
+  const link = base + '?code=' + sessionCode;
+  const msg = '나 We+ 커플 MRI 했어! 너도 응답해줘 ➜ ' + link;
+  if (navigator.share) {
+    navigator.share({ title:'We+ 커플 MRI', text: msg, url: link });
+  } else {
+    navigator.clipboard.writeText(link).then(()=>{ alert('링크가 복사됐어요! 카카오톡에 붙여넣으세요 😊'); });
+  }
+}
+
+// 대기 화면으로 이동 + 폴링 시작
+function goToWaiting() {
+  if (!sessionCode) { alert('세션 코드가 없습니다. 잠시 후 다시 시도해주세요.'); return; }
+  const el = document.getElementById('wait-code');
+  if (el) el.textContent = sessionCode;
+  goScreen('s-wait');
+  startPolling();
+}
+
+// 5초마다 B 완료 여부 확인
+function startPolling() {
+  if (waitInterval) clearInterval(waitInterval);
+  waitInterval = setInterval(async ()=>{
+    try {
+      const sb = getSB();
+      const { data } = await sb
+        .from('couple_sessions')
+        .select('status,b_phbs,b_values')
+        .eq('code', sessionCode)
+        .single();
+      const txt = document.getElementById('wait-status-txt');
+      if (data && data.status === 'complete') {
+        clearInterval(waitInterval);
+        partnerPhbs = data.b_phbs;
+        partnerVals = data.b_values;
+        if (txt) txt.textContent = '✅ 파트너 응답 완료! 커플 MRI 생성 중...';
+        goScreen('s-proc2');
+        setTimeout(()=>{
+          renderCoupleResult();
+          goScreen('s-rc');
+          setTimeout(()=>{ animateRcBars(); initRcScroll(); }, 400);
+        }, 2200);
+      } else {
+        if (txt) txt.textContent = '파트너 응답 기다리는 중... (' + new Date().toLocaleTimeString() + ')';
+      }
+    } catch(e) { console.warn('폴링 오류:', e); }
+  }, 5000);
+}
+
+// B 모드: URL에서 코드 로딩
+async function initBMode(code) {
+  try {
+    const sb = getSB();
+    const { data, error } = await sb
+      .from('couple_sessions')
+      .select('*')
+      .eq('code', code)
+      .single();
+    if (error || !data) {
+      alert('링크가 올바르지 않거나 만료되었습니다.');
+      return;
+    }
+    if (data.status === 'complete') {
+      alert('이미 완료된 세션입니다.');
+      return;
+    }
+    // A 데이터를 파트너로 설정
+    partnerPhbs = data.a_phbs;
+    partnerVals = data.a_values;
+    sessionCode = code;
+    isBMode = true;
+    // 랜딩 화면 B 모드 텍스트 변경
+    const t = document.querySelector('.land-title');
+    if (t) t.textContent = '💑 커플 MRI 초대';
+    const s = document.querySelector('.land-sub');
+    if (s) s.textContent = '파트너가 이미 응답을 완료했어요!\n지금 응답하면 커플 MRI가 잠금 해제됩니다 🔓';
+    const btn = document.querySelector('#s-land .btn-primary');
+    if (btn) btn.textContent = '🔓 내 응답 시작하기';
+  } catch(e) {
+    alert('세션 로딩 오류: ' + e.message);
+  }
+}
+
+// 페이지 로드 시 URL 파라미터 확인
+window.addEventListener('DOMContentLoaded', ()=>{
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  if (code) initBMode(code.toUpperCase());
+});
+
+function set(id, txt) {
+  const el = document.getElementById(id);
+  if(el) el.textContent = txt;
+}
+
+function renderPersonal() {
+  const t = TYPE_MAP[getTypeKey(myPhbs)];
+  const p = myPhbs;
+  if(!t) return;
+
+  // ── 핵심 위험 패턴 히어로
+  set('rp-emoji', t.emoji);
+  set('rp-type-name', t.name);
+  const tagEl = document.getElementById('rp-type-tag');
+  if(tagEl) tagEl.innerHTML = t.tags.map(tag=>`<span class="danger-tag">${tag}</span>`).join('');
+  set('rp-danger-text', t.danger || t.conflict);
+  set('rp-danger-detail', t.dangerDetail || t.insight);
+  set('rp-action-text', t.action || t.gro[0]);
+  set('rp-loop', t.loop);
+
+  // ── 4축 타일 (보조)
+  const pNet = p.pursue - p.avoid;
+  const pPct = Math.round(((pNet+16)/32)*100);
+  const hPct = Math.round(((p.h-6)/24)*100);
+  const bPct = Math.round(((p.b-3)/12)*100);
+  const sPct = Math.round(((p.s-3)/12)*100);
+  set('tile-p', getPType(p)==='pursuer'?'추격형':getPType(p)==='distancer'?'회피형':'유연형');
+  set('tile-ps', `격차 ${pNet>0?'+':''}${pNet}`);
+  set('tile-h', getHType(p)==='hot'?'고온':getHType(p)==='cool'?'저온':'중온');
+  set('tile-hs', `${p.h}점`);
+  set('tile-b', p.b>=12?'고결합':p.b>=8?'균형':'저결합');
+  set('tile-bs', `${p.b}점`);
+  set('tile-s', p.s>=12?'고불안':p.s>=8?'보통':'안정');
+  set('tile-ss', `${p.s}점`);
+
+  // ── PHBS 4축 바 그래프
+  const bars = [
+    {id:'bar-p', sc:'sc-p', qid:'q-p', pct: Math.max(8, Math.min(92, pPct)),
+     label: getPType(p)==='pursuer'?`추격 우세 (+${Math.abs(pNet)})`:getPType(p)==='distancer'?`회피 우세 (${pNet})`:' 유연 (균형)',
+     q: getPType(p)==='pursuer'?'갈등이 생기면 바로 풀고 싶어집니다. 상대가 피할수록 더 다가가는 경향이 있어요.':
+        getPType(p)==='distancer'?'갈등이 생기면 잠시 거리를 두고 싶어집니다. 충분히 생각한 후 대화하는 방식을 선호해요.':
+        '상황에 따라 유연하게 대처합니다. 즉각 해결하기도, 시간을 두기도 해요.'},
+    {id:'bar-h', sc:'sc-h', qid:'q-h', pct: Math.max(8, Math.min(92, hPct)),
+     label: `${getHType(p)==='hot'?'감정 고온':getHType(p)==='cool'?'감정 저온':'감정 중온'} (${p.h}점)`,
+     q: getHType(p)==='hot'?'감정이 빠르고 강하게 올라옵니다. 표현이 풍부해 파트너와 깊은 감정 교류를 원해요.':
+        getHType(p)==='cool'?'감정이 천천히 올라오고 이성적으로 조절하는 편입니다.':
+        '감정 표현이 적당히 균형 잡혀 있습니다.'},
+    {id:'bar-b', sc:'sc-b', qid:'q-b', pct: Math.max(8, Math.min(92, bPct)),
+     label: `${p.b>=12?'결합 지향':p.b>=8?'균형':'독립 지향'} (${p.b}점)`,
+     q: p.b>=12?'함께 있는 시간과 공동 결정을 중요하게 생각합니다.':
+        p.b>=8?'함께하는 시간과 개인 시간 사이의 균형을 중요하게 생각합니다.':
+        '나만의 공간과 독립적인 영역이 중요합니다.'},
+    {id:'bar-s', sc:'sc-s', qid:'q-s', pct: Math.max(8, Math.min(92, sPct)),
+     label: `${p.s>=12?'불안 애착':p.s>=8?'보통':'안정 애착'} (${p.s}점)`,
+     q: p.s>=12?'관계에서 상대의 반응이 달라지면 금방 불안을 느끼는 편입니다.':
+        p.s>=8?'관계에서 가끔 불안을 느끼지만 전반적으로 안정적입니다.':
+        '관계에서 안정감을 잘 유지합니다.'}
+  ];
+
+  // 간략화: 직접 label 텍스트 설정
+  const hLabel = getHType(p)==='hot'?'감정 고온':getHType(p)==='cool'?'감정 저온':'감정 중온';
+  const bLabel = p.b>=12?'결합 지향':p.b>=8?'균형':'독립 지향';
+  const sLabel = p.s>=12?'불안 애착':p.s>=8?'보통':'안정 애착';
+  const pLabel = getPType(p)==='pursuer'?`추격 우세 (+${Math.abs(pNet)})`:getPType(p)==='distancer'?`회피 우세 (${pNet})`:'유연 (균형)';
+
+  set('sc-p', pLabel);
+  set('sc-h', `${hLabel} (${p.h}점)`);
+  set('sc-b', `${bLabel} (${p.b}점)`);
+  set('sc-s', `${sLabel} (${p.s}점)`);
+
+  // 말풍선 텍스트
+  const qPtxt = getPType(p)==='pursuer'?'갈등이 생기면 그날 안에 꼭 풀고 싶어집니다. 침묵이 오래되면 더 불안해져요.':
+               getPType(p)==='distancer'?'갈등이 생기면 잠시 혼자 생각을 정리하고 싶어집니다.':
+               '상황에 따라 즉시 풀기도, 시간을 두기도 해요.';
+  const qHtxt = getHType(p)==='hot'?'감정이 빠르게 올라오고 표현도 강한 편입니다. 파트너와 감정 교류를 깊이 원해요.':
+               getHType(p)==='cool'?'감정을 이성적으로 조절하는 편입니다. 차분하게 상황을 파악해요.':
+               '감정 표현이 적당히 균형 잡혀 있어요.';
+  const qBtxt = p.b>=12?'함께하는 시간과 공동 결정을 중시합니다. 관계에 많이 투자하는 편이에요.':
+               p.b>=8?'함께하는 시간과 개인 시간 사이 균형을 중요하게 봐요.':
+               '나만의 공간과 독립성이 중요합니다. 함께이면서도 각자의 영역이 필요해요.';
+  const qStxt = p.s>=12?'상대의 반응 변화에 예민하고 관계가 멀어질까 걱정될 때가 있어요.':
+               p.s>=8?'가끔 관계에서 불안을 느끼지만 전반적으로 안정적이에요.':
+               '관계에서 안정감을 잘 유지합니다. 상대를 쉽게 신뢰해요.';
+  set('q-p', qPtxt); set('q-h', qHtxt); set('q-b', qBtxt); set('q-s', qStxt);
+
+  // 숨겨진 보조 ID
+  set('type-combo-title', t.name); set('type-combo-desc', t.desc);
+
+  // ── 인사이트 (나의 유형 섹션)
+  set('ins1-p', t.desc);
+  set('ins2-p', t.rel);
+  set('ins3-p', t.insight);
+
+  // ── 갈등 반응 섹션
+  set('conflict-p', t.conflict);
+  set('sw1', t.str[0]);
+  set('sw2', t.gro[0]);
+  set('sw3', t.str[1]||'');
+  set('sw4', t.gro[1]||'');
+
+  // ── 주의 포인트
+  set('w1t', t.w1[0]); set('w1p', t.w1[1]);
+  set('w2t', t.w2[0]); set('w2p', t.w2[1]);
+  set('w3t', t.w3[0]); set('w3p', t.w3[1]);
+
+  // ── 카카오 메시지
+  const kakaoMsgs = {
+    'pursuer-hot':'나 We+ 커플 MRI 해봤더니 "정열 탐색자" 나왔어 🔥 너도 해봐! 우리 결과 비교해보자 [링크]',
+    'pursuer-warm':'We+ 커플 MRI 해봤어 💬 나는 "따뜻한 소통자"래. 너는 어떤 유형일지 궁금해! [링크]',
+    'pursuer-cool':'We+ 커플 MRI에서 나 "논리적 해결자" 나왔어 🎯 너도 해봐, 우리 얼마나 잘 맞는지 확인해보자 [링크]',
+    'flexible-hot':'We+ 커플 MRI 해봤어 🌈 나는 "감성 조율자"래! 10분이면 돼, 너도 해보고 같이 결과 비교해 [링크]',
+    'flexible-warm':'We+ 커플 MRI에서 나 "안정적 동반자" 나왔어 ⚖️ 결혼 전에 같이 해보면 좋을 것 같아 [링크]',
+    'flexible-cool':'We+ 커플 MRI 해봤더니 "차분한 중재자" 나왔어 🌊 너도 해봐! 결과 비교하면 재밌을 것 같아 [링크]',
+    'distancer-hot':'We+ 커플 MRI에서 나 "내면 탐구자" 나왔어 🌙 우리 결혼 전에 같이 확인해보자 [링크]',
+    'distancer-warm':'We+ 커플 MRI 해봤어 🏔️ 나는 "신중한 독립자"래. 너도 해봐! 10분이면 돼 [링크]',
+    'distancer-cool':'We+ 커플 MRI에서 나 "평온한 거리두기" 나왔어 🍃 너도 해보고 우리 결과 같이 봐 [링크]',
+  };
+  set('kakao-msg', kakaoMsgs[getTypeKey(myPhbs)] || `나 We+ 커플 MRI에서 "${t.name}" 나왔어! 너도 해봐 🧬 [링크]`);
+}
+
+function animateRpBars() {
+  ['p','h','b','s'].forEach(ax=>{
+    const bar = document.getElementById('bar-'+ax);
+    if(bar) bar.style.width = (bar.dataset.w||50)+'%';
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// 개인결과 스크롤 탭 네비게이션
+// ═══════════════════════════════════════════════════════
+function rpScrollTo(secId, tabEl) {
+  const el = document.getElementById(secId);
+  const scr = document.getElementById('s-rp');
+  if(!el||!scr) return;
+  scr.scrollTo({top: el.offsetTop-108, behavior:'smooth'});
+  document.querySelectorAll('#rp-tabs .rstab').forEach(t=>t.classList.remove('on'));
+  if(tabEl) tabEl.classList.add('on');
+}
+
+function initRpScroll() {
+  const scr = document.getElementById('s-rp');
+  const secs = ['rps-danger','rps-type','rps-reaction','rps-invite'];
+  const tabs = document.querySelectorAll('#rp-tabs .rstab');
+  scr.addEventListener('scroll', function(){
+    let active=0;
+    const scrTop = scr.scrollTop+120;
+    secs.forEach((sid,i)=>{ const e=document.getElementById(sid); if(e&&e.offsetTop<=scrTop) active=i; });
+    tabs.forEach((t,i)=>t.classList.toggle('on', i===active));
+  }, {passive:true});
+}
+
+// ═══════════════════════════════════════════════════════
+// 파트너 시뮬레이션
+// ═══════════════════════════════════════════════════════
+function simPartner() {
+  const preset = PARTNER_PRESETS[Math.floor(Math.random()*PARTNER_PRESETS.length)];
+  partnerPhbs = preset.phbs;
+  partnerVals = preset.vals;
+  partnerInfo = {name:preset.name, emoji:preset.emoji};
+  goScreen('s-wait');
+  setTimeout(()=>{
+    goScreen('s-proc2');
+    setTimeout(()=>{
+      renderCoupleResult();
+      goScreen('s-rc');
+      setTimeout(()=>{ animateRcBars(); initRcScroll(); }, 400);
+    }, 2000);
+  }, 1500);
+}
+
+function showCoupleResult() {
+  if(!partnerPhbs){ simPartner(); return; }
+  goScreen('s-proc2');
+  setTimeout(()=>{
+    renderCoupleResult();
+    goScreen('s-rc');
+    setTimeout(()=>{ animateRcBars(); initRcScroll(); }, 400);
+  }, 1500);
+}
+
+// ═══════════════════════════════════════════════════════
+// 가치관 일치율 계산
+// ═══════════════════════════════════════════════════════
+const DOMAINS = [
+  {name:'원가족 경계', icon:'🏠', idxs:[0,1,2,3,4]},
+  {name:'경제관',      icon:'💰', idxs:[5,6,7,8]},
+  {name:'가사/역할',   icon:'🍳', idxs:[9,10,11,12]},
+  {name:'삶의 우선순위',icon:'⭐', idxs:[13,14,15,16]},
+  {name:'자녀/미래',   icon:'👶', idxs:[17,18,19]},
+];
+
+function scoreValMatch(mv, pv) {
+  return DOMAINS.map(d=>{
+    let match=0, total=0;
+    d.idxs.forEach(i=>{ if(mv[i]!==undefined&&pv[i]!==undefined){ total++; if(mv[i]===pv[i]) match++; }});
+    const pct = total?Math.round((match/total)*100):0;
+    const light = pct>=80?'🟢':pct>=60?'🟡':'🔴';
+    const status = pct>=80?'잘 맞음':pct>=60?'조율 필요':'대화 시급';
+    return {name:d.name, icon:d.icon, pct, light, status, match, total};
+  });
+}
+
+function getTopicCards(mv, pv) {
+  // 각 영역별 불일치 수 계산 후 차이 큰 3개 선별
+  const DOMAINS_META = [
+    {name:'원가족 경계', idxs:[0,1,2,3,4], color:'#6C3483',
+     whys:['명절과 가족 방문 방식은 결혼 초기 갈등의 1위 원인입니다','부모님과의 연락 빈도 차이는 배우자를 소외감 느끼게 할 수 있어요','부모님 개입 기준이 다르면 매번 사건마다 부딪힐 수 있어요','경제적 지원 방식이 다르면 갈등이 장기화될 수 있어요','거주 거리에 대한 기대 차이는 삶의 질과 직결됩니다'],
+     starters:['명절에 우리는 어떻게 보내고 싶어? 각자 생각을 먼저 말해보자','부모님과 연락이나 만남에 대해 어떻게 생각해? 솔직하게 얘기해줘','부모님이 우리 결정에 관여하시는 건 어느 정도가 적당하다고 생각해?','부모님 경제적 지원에 대해 결혼 전에 꼭 얘기해야 할 것 같아. 어떻게 생각해?','결혼 후 부모님 집이랑 어느 정도 거리에 살고 싶어?'],
+     agrees:['연 X회 방문, 명절은 교대 방식으로 미리 합의하기','연락 빈도와 방문 시기를 부부가 함께 결정하는 원칙 세우기','우리 부부의 결정 영역과 부모님 의견 수렴 범위 미리 구분해두기','매달 지원 금액과 방식을 결혼 전에 함께 설정하기','출퇴근 거리, 긴급 상황 대응 등을 고려해 함께 결정하기']},
+    {name:'경제관', idxs:[5,6,7,8], color:'#1A5276',
+     whys:['재정 관리 방식 차이는 결혼 후 가장 잦은 갈등 원인 중 하나입니다','큰 지출 결정 방식이 다르면 신뢰 문제로 이어질 수 있어요','돈의 우선순위가 다르면 한 명이 계속 참아야 하는 상황이 생겨요','경력 단절 시 경제적 부담 분담 방식을 미리 합의해야 해요'],
+     starters:['우리 결혼하면 돈 어떻게 관리할 거야? 각자 생각 말해보자','큰 돈 쓸 때 어떻게 결정하는 게 좋다고 생각해?','결혼하면 돈을 뭐에 가장 먼저 쓰고 싶어? 우선순위 얘기해보자','만약 한 명이 일을 못 하게 되면 생활비를 어떻게 할지 미리 이야기해두자'],
+     agrees:['공동 계좌 + 개인 계좌 비율 합의하기','X만원 이상 지출은 반드시 사전 합의 원칙 정하기','저축 목표와 생활비 예산을 함께 설정하기','수입 공백 시 생활비 분담 방식을 미리 시뮬레이션해보기']},
+    {name:'가사/역할', idxs:[9,10,11,12], color:'#1E8449',
+     whys:['가사 분담 불균형은 장기적으로 가장 큰 불만 원인이 됩니다','맞벌이 상황에서의 역할 분담은 미리 명확히 해야 해요','식사 방식 차이는 매일 반복되는 작은 갈등이 됩니다','커리어 우선순위 차이는 서로를 존중하지 못한다는 느낌을 줄 수 있어요'],
+     starters:['청소, 요리, 빨래 이런 거 어떻게 나눌까? 각자 생각 얘기해보자','맞벌이하면 가사를 어떻게 나누는 게 공평하다고 생각해?','밥은 보통 어떻게 해결할 생각이야? 집에서 요리할 생각이야, 아니면 시켜먹을 것 같아?','결혼 후 일이랑 가정 중에 뭘 더 우선할 것 같아? 솔직하게 얘기해봐'],
+     agrees:['가사 분담표 시범 운영 후 2주마다 피드백하기','맞벌이 상황에 따른 가사 조정 원칙 미리 정하기','외식/배달/요리 비율을 함께 정하고 시범 운영하기','서로의 커리어를 지지하는 원칙을 함께 세우기']},
+    {name:'삶의 우선순위', idxs:[13,14,15,16], color:'#784212',
+     whys:['개인 시간 기대치 차이는 "나를 통제한다"는 느낌으로 이어질 수 있어요','친구 관계 방식 차이는 결혼 후 갑자기 충돌할 수 있어요','결혼 생활에서 가장 중요한 가치가 다르면 방향 자체가 달라져요','함께하는 시간의 빈도와 질에 대한 기대가 다르면 지속적으로 갈등이 생겨요'],
+     starters:['결혼하면 각자 시간을 어느 정도 가져야 한다고 생각해?','친구들이랑 만남은 결혼 후에도 얼마나 유지하고 싶어?','결혼 생활에서 뭐가 가장 중요하다고 생각해? 한 가지만 골라보면?','우리 둘만의 시간을 얼마나 만들어야 한다고 생각해?'],
+     agrees:['개인 시간과 함께하는 시간 비율 대략 합의하기','친구 모임 빈도와 배우자 동반 원칙 함께 정하기','서로가 가장 중요하게 생각하는 가치를 알고 그걸 존중하기','정기적인 데이트 시간 함께 만들어가기']},
+    {name:'자녀/미래', idxs:[17,18,19], color:'#2471A3',
+     whys:['자녀 계획 차이는 관계에서 가장 근본적인 방향 불일치입니다','육아 방식 차이는 자녀 탄생 이후 극심한 갈등으로 이어질 수 있어요','결혼 후 첫 5년의 목표가 다르면 매년 작은 충돌이 쌓입니다'],
+     starters:['자녀는 언제쯤 가지면 좋겠어? 솔직하게 얘기해줘','아이 낳으면 어떻게 키울 것 같아? 누가 더 많이 볼 것 같아?','결혼하고 5년 안에 뭘 꼭 이루고 싶어? 한 가지만 말해줘'],
+     agrees:['자녀 계획 시기와 방식에 대해 구체적으로 합의하기','육아 분담과 외부 도움 범위 미리 논의하기','공통 5년 목표를 2~3가지 함께 설정하기']}
+  ];
+
+  // 영역별 불일치 수 계산
+  const domainScores = DOMAINS_META.map((d,di) => {
+    let mismatch = 0;
+    d.idxs.forEach(i => { if(mv[i] !== pv[i]) mismatch++; });
+    return {di, mismatch, ratio: mismatch/d.idxs.length};
+  });
+  domainScores.sort((a,b) => b.ratio - a.ratio);
+
+  // 상위 3개 도메인에서 대화 카드 생성
+  const cards = [];
+  for(let rank=0; rank<3 && rank<domainScores.length; rank++) {
+    const {di} = domainScores[rank];
+    const d = DOMAINS_META[di];
+    // 불일치 항목 중 첫 번째
+    let firstMismatch = -1;
+    for(let i=0; i<d.idxs.length; i++) {
+      if(mv[d.idxs[i]] !== pv[d.idxs[i]]) { firstMismatch = i; break; }
+    }
+    if(firstMismatch === -1) firstMismatch = 0;
+    const qIdx = d.idxs[firstMismatch];
+    const vq = VQS[qIdx];
+    const myChoice = vq && mv[qIdx] !== undefined ? vq.opts[mv[qIdx]] : '(미응답)';
+    const ptChoice = vq && pv[qIdx] !== undefined ? vq.opts[pv[qIdx]] : '(미응답)';
+
+    cards.push({
+      rank: rank+1,
+      domain: d.name,
+      color: d.color,
+      topic: vq ? vq.text : d.name,
+      why: d.whys[firstMismatch] || d.whys[0],
+      myChoice,
+      ptChoice,
+      starter: d.starters[firstMismatch] || d.starters[0],
+      agree: d.agrees[firstMismatch] || d.agrees[0],
+      mismatchPct: Math.round(domainScores[rank].ratio * 100)
+    });
+  }
+  return cards;
+}
+
+function renderCoupleResult() {
+  const mv = myVals, pv = partnerVals;
+  const mp = myPhbs, pp = partnerPhbs;
+  const pi = partnerInfo;
+  const myT = TYPE_MAP[getTypeKey(mp)];
+  const ptT = TYPE_MAP[getTypeKey(pp)];
+  const myKey = getTypeKey(mp);
+  const ptKey = getTypeKey(pp);
+
+  // ── 유형 라벨
+  const el1 = document.getElementById('c-my-type-label');
+  const el2 = document.getElementById('c-partner-type-label');
+  if(el1) el1.textContent = myT ? myT.name : '나';
+  if(el2) el2.textContent = (ptT ? ptT.name : '파트너') + (pi ? ` (${pi.name})` : '');
+
+  // ── 핵심 과제 계산 (기질 조합 기반)
+  const CORE_TASKS = {
+    'pursuer-distancer': {
+      title:'추격-회피 갈등 루프 끊기',
+      desc:'한 명은 즉시 풀고 싶고, 한 명은 거리가 필요합니다. 이 패턴을 인식하지 못하면 대화할수록 더 멀어지는 루프가 반복됩니다. 결혼 전 "타임아웃 신호"를 함께 만들어두세요.'
+    },
+    'distancer-pursuer': {
+      title:'추격-회피 갈등 루프 끊기',
+      desc:'한 명은 거리가 필요하고, 한 명은 즉시 풀고 싶습니다. 이 패턴을 인식하지 못하면 대화할수록 더 멀어지는 루프가 반복됩니다. 결혼 전 "타임아웃 신호"를 함께 만들어두세요.'
+    },
+    'pursuer-pursuer': {
+      title:'감정 과부하 없이 대화하는 방식 찾기',
+      desc:'둘 다 즉시 해결하려는 성향이라 갈등 시 감정이 과열될 수 있습니다. "지금 당장"의 압박 없이 대화하는 규칙을 미리 만들어두세요.'
+    },
+    'distancer-distancer': {
+      title:'회피 없이 불편함을 표현하는 습관 만들기',
+      desc:'둘 다 거리를 두려는 성향이라 갈등이 수면 아래 쌓일 수 있습니다. 작은 불편함도 정기적으로 꺼내는 대화 루틴을 함께 만드세요.'
+    },
+    'pursuer-flexible': {
+      title:'대화 타이밍과 속도를 함께 조율하기',
+      desc:'추격 성향인 나와 유연한 파트너 사이에서 대화 타이밍 차이가 생길 수 있습니다. 언제, 어떻게 이야기할지 미리 약속해두세요.'
+    },
+    'flexible-pursuer': {
+      title:'대화 타이밍과 속도를 함께 조율하기',
+      desc:'유연한 나와 추격 성향인 파트너 사이에서 대화 속도 차이가 갈등이 될 수 있습니다. 서로의 페이스를 이해하는 대화 방식을 찾아보세요.'
+    },
+    'distancer-flexible': {
+      title:'침묵 대신 "복귀 약속"으로 연결감 유지하기',
+      desc:'회피 성향인 나와 유연한 파트너. 내가 거리를 둘 때 파트너가 불안하지 않도록 "언제 돌아올게"라는 신호 체계를 만들어두세요.'
+    },
+    'flexible-distancer': {
+      title:'파트너의 침묵을 거절로 오해하지 않기',
+      desc:'유연한 나와 회피 성향인 파트너. 파트너가 거리를 둘 때 거절이 아니라 처리 시간 필요로 이해하는 약속을 함께 만들어두세요.'
+    },
+    'flexible-flexible': {
+      title:'정기적인 관계 점검 시간 만들기',
+      desc:'둘 다 유연해서 겉으로는 갈등이 없어 보일 수 있습니다. 하지만 표현되지 않은 불만이 쌓이지 않도록 정기적으로 솔직하게 이야기하는 시간을 만드세요.'
+    },
+  };
+  const myP = getPType(mp); const ptP = getPType(pp);
+  const taskKey = `${myP}-${ptP}`;
+  const task = CORE_TASKS[taskKey] || {title:'서로의 갈등 방식 이해하기', desc:'두 사람의 기질 차이를 인식하고, 갈등 시 각자가 필요한 것을 미리 이야기해두세요.'};
+  set('c-core-task-title', task.title);
+  set('c-core-task-desc', task.desc);
+
+  // ── 기질 조합 칩
+  const myChip = document.getElementById('c-my-combo-chip');
+  const ptChip = document.getElementById('c-partner-combo-chip');
+  if(myT && myChip) myChip.textContent = `${myT.emoji} ${myT.name}`;
+  if(ptT && ptChip) ptChip.textContent = `${ptT.emoji} ${ptT.name}`;
+  set('c-combo-title', myT && ptT ? `${myT.name} ↔ ${ptT.name} 조합 분석` : '기질 조합 분석');
+
+  // ── 갈등 패턴 (기질 조합 기반)
+  const COMBO_CONFLICT = {
+    'pursuer-distancer':'추격형인 내가 해결을 요구할수록, 회피형인 파트너는 더 멀어지려 합니다. 이 루프가 반복되면 한 명은 "왜 말을 안 해"라고 하고, 한 명은 "왜 이렇게 몰아붙여"라고 느끼게 됩니다.',
+    'distancer-pursuer':'추격형인 파트너가 해결을 요구할수록, 회피형인 내가 더 멀어지려 합니다. 파트너는 내 침묵이 거절처럼 느껴지고, 나는 파트너가 몰아붙이는 것처럼 느껴질 수 있어요.',
+    'pursuer-pursuer':'둘 다 즉시 해결하려다 보니 갈등 상황에서 감정이 과열될 수 있습니다. 서로 더 강하게 이야기하다가 정작 문제 해결보다 감정 싸움이 될 수 있어요.',
+    'distancer-distancer':'둘 다 거리를 두려 하니 갈등이 표면에 드러나지 않습니다. 각자 속으로 쌓다가 어느 날 예상치 못한 폭발이 올 수 있어요.',
+    'pursuer-flexible':'추격 성향인 내가 즉시 대화를 요청할 때, 유연한 파트너는 타이밍이 안 맞을 수 있어요. 파트너가 준비되기 전에 대화를 밀어붙이면 압박감이 생길 수 있어요.',
+    'flexible-pursuer':'추격 성향인 파트너가 즉시 대화를 원할 때, 유연한 나는 준비가 안 된 경우도 있어요. 파트너는 내가 미루는 것처럼 느낄 수 있어요.',
+    'distancer-flexible':'회피 성향인 내가 거리를 두면, 유연한 파트너는 이해하려 하지만 가끔 불안해질 수 있어요.',
+    'flexible-distancer':'유연한 내가 파트너의 침묵을 이해하려 해도, 회피 성향인 파트너가 너무 오래 거리를 두면 연결감이 끊기는 느낌이 들 수 있어요.',
+    'flexible-flexible':'둘 다 유연해서 갈등은 잘 없어 보이지만, 표현되지 않은 불만이 조용히 쌓이는 패턴이 생길 수 있어요.',
+  };
+  const COMBO_HINT = {
+    'pursuer-distancer':'"타임아웃" 신호 만들기: 파트너가 "30분만 줘"라고 하면, 나는 기다리기. 반드시 30분 후에 돌아오기.',
+    'distancer-pursuer':'"복귀 약속" 신호 만들기: 내가 거리가 필요할 때 "저녁에 이야기하자"라고 먼저 말하기.',
+    'pursuer-pursuer':'"쿨다운 타임" 규칙: 갈등 시 15분 각자 진정 후 다시 대화하기.',
+    'distancer-distancer':'"관계 체크인" 루틴: 주 1회 "요즘 우리 사이에서 불편한 게 있어?" 묻기.',
+    'pursuer-flexible':'"준비됐어?" 한 마디: 대화 전에 파트너의 준비 여부 먼저 확인하기.',
+    'flexible-pursuer':'"10분 안에 답하기" 약속: 파트너가 대화를 요청하면 10분 안에 시작 신호 주기.',
+    'distancer-flexible':'"타이머 복귀" 약속: 거리가 필요할 때 언제 돌아올지 구체적으로 알려주기.',
+    'flexible-distancer':'"처리 시간 존중" 약속: 파트너가 거리를 두면 최소 X시간은 기다려주기.',
+    'flexible-flexible':'"월간 솔직 대화" 루틴: 매달 한 번 "이번 달 아쉬웠던 것" 서로 이야기하기.',
+  };
+  set('c-conflict-body', COMBO_CONFLICT[taskKey] || '두 사람의 갈등 방식이 충돌할 때 서로의 필요를 명확히 표현하는 것이 중요합니다.');
+  set('c-combo-hint', COMBO_HINT[taskKey] || '서로의 갈등 방식을 인정하고, 대화 방식에 대한 규칙을 미리 합의해두세요.');
+
+  // ── 가치관 일치율
+  const valResult = scoreValMatch(mv, pv);
+  const pct = Math.round(valResult.overall * 100);
+  set('c-pct', pct + '%');
+  const matchDesc = pct>=80?'두 분의 결혼 가치관은 전반적으로 잘 맞습니다. 차이가 있는 부분만 대화해보세요.':
+                   pct>=60?'몇 가지 중요한 영역에서 차이가 있어요. 지금 대화해두면 나중이 훨씬 편해집니다.':
+                   '여러 영역에서 차이가 있어요. 지금이 바로 대화를 시작해야 할 때입니다.';
+  set('c-match-desc', matchDesc);
+
+  // ── 가치관 신호등 (라벨형 재구성)
+  const DOMAIN_NAMES = ['원가족 경계','경제관','가사/역할','삶의 우선순위','자녀/미래'];
+  const DOMAIN_IDXS = [[0,1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16],[17,18,19]];
+  const DOMAIN_DESC = [
+    '명절, 부모님 연락 빈도, 개입 정도 등',
+    '재정 관리, 큰 지출 결정, 저축 우선순위 등',
+    '가사 분담, 맞벌이 역할, 식사 방식 등',
+    '개인 시간, 친구 관계, 삶의 가치 등',
+    '자녀 계획, 육아 방식, 미래 목표 등'
+  ];
+  const STATUS_MAP = [
+    {cls:'safe', label:'✅ 비교적 안정'},
+    {cls:'caution', label:'🔶 조율 필요'},
+    {cls:'conflict', label:'🔴 핵심 충돌'},
+    {cls:'critical', label:'⚡ 합의 필요'}
+  ];
+
+  const signalEl = document.getElementById('c-signal-list');
+  if(signalEl) {
+    signalEl.innerHTML = DOMAIN_NAMES.map((name, di) => {
+      const idxs = DOMAIN_IDXS[di];
+      const matches = idxs.filter(i => mv[i] === pv[i]).length;
+      const ratio = matches / idxs.length;
+      let statusIdx = ratio>=0.8?0:ratio>=0.6?1:ratio>=0.4?2:3;
+      const s = STATUS_MAP[statusIdx];
+      return `<div class="val-status-item ${s.cls}">
+        <div class="val-status-header">
+          <div class="val-status-name">${name}</div>
+          <div class="val-status-label ${s.cls}">${s.label}</div>
+        </div>
+        <div class="val-status-desc">${DOMAIN_DESC[di]} · ${matches}/${idxs.length}문항 일치</div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── 대화 카드 (실전형)
+  const cards = getTopicCards(mv, pv);
+  const talkEl = document.getElementById('c-talk-cards');
+  if(talkEl) {
+    talkEl.innerHTML = cards.map(c => `
+      <div class="talk-v3-card" style="border-left-color:${c.color}">
+        <div class="talk-v3-header">
+          <div class="talk-v3-num">대화 ${c.rank}</div>
+          <div class="talk-v3-topic">${c.topic}</div>
+        </div>
+        <div class="talk-v3-why">
+          <div class="talk-v3-why-icon">📌</div>
+          <div class="talk-v3-why-text">왜 중요한가: ${c.why}</div>
+        </div>
+        <div class="talk-v3-diff">
+          <div class="talk-v3-diff-title">현재 두 사람의 차이</div>
+          <div class="talk-v3-split">
+            <div class="talk-v3-box" style="background:rgba(36,113,163,.1)">
+              <div class="talk-v3-who" style="color:var(--col-b)">👩 나의 선택</div>
+              <div class="talk-v3-choice">${c.myChoice}</div>
+            </div>
+            <div class="talk-v3-box" style="background:rgba(142,68,173,.1)">
+              <div class="talk-v3-who" style="color:var(--col-h)">👨 파트너 선택</div>
+              <div class="talk-v3-choice">${c.ptChoice}</div>
+            </div>
+          </div>
+        </div>
+        <div class="talk-v3-starter">
+          <div class="talk-v3-starter-icon">💬</div>
+          <div class="talk-v3-starter-body">
+            <div class="talk-v3-starter-label">대화 시작 문장</div>
+            <div class="talk-v3-starter-text">"${c.starter}"</div>
+          </div>
+        </div>
+        <div class="talk-v3-agree">
+          <div class="talk-v3-agree-icon">✅</div>
+          <div class="talk-v3-agree-text">합의 포인트: ${c.agree}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  // ── 관계 규칙 3가지
+  const rules = buildRelRules(myKey, ptKey, valResult);
+  const rulesEl = document.getElementById('c-rules-list');
+  if(rulesEl) {
+    rulesEl.innerHTML = rules.map((r,i) => `
+      <div class="rule-card">
+        <div class="rule-card-header">
+          <div class="rule-num">${i+1}</div>
+          <div class="rule-title">${r.title}</div>
+        </div>
+        <div class="rule-body">
+          <div class="rule-desc">${r.desc}</div>
+          <div class="rule-practice">💡 실천 방법: ${r.practice}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  // ── 숨겨진 보조 ID (JS 호환성 유지)
+  set('c-insight-text', task.desc);
+  set('c-best-title', '서로의 차이를 알고 있다는 것 자체가 강점입니다');
+  set('c-best-text', '두 사람이 함께 이 검사를 하고 결과를 나누는 것만으로도 결혼 준비의 가장 중요한 단계를 밟은 겁니다.');
+  set('c-risk-title', task.title);
+  set('c-risk-text', task.desc);
+  set('c-suggest', rules[0] ? rules[0].practice : '서로의 갈등 방식에 대해 대화해보세요.');
+  set('c-sum-items', '');
+}
+
+function buildRelRules(myKey, ptKey, valResult) {
+  const taskKey = `${getPType(myPhbs)}-${getPType(partnerPhbs)}`;
+  const RULE_TEMPLATES = {
+    'pursuer-distancer': [
+      {title:'"타임아웃" 신호 함께 만들기', desc:'회피형 파트너가 "잠깐만"이라고 하면, 추격형인 나는 최소 30분은 기다립니다. 파트너는 반드시 그 시간 안에 돌아오기로 약속해요.', practice:'"30분 타임아웃" 카드를 실제로 만들어두고, 갈등 시 꺼내기'},
+      {title:'대화 전 "준비됐어?" 물어보기', desc:'즉시 해결하고 싶은 마음은 자연스럽습니다. 하지만 파트너가 준비되지 않은 상태에서 대화를 시작하면 더 멀어질 수 있어요.', practice:'대화 요청할 때 항상 "지금 이야기 괜찮아?"로 시작하기'},
+      {title:'작은 갈등은 당일, 큰 갈등은 다음날', desc:'모든 갈등을 그날 풀려다 보면 서로 지칩니다. 감정이 큰 갈등은 다음날 차분할 때 이야기하는 원칙을 세워두세요.', practice:'오늘 밤 10시 이후에는 갈등 대화 하지 않기 규칙 만들기'}
+    ],
+    'distancer-pursuer': [
+      {title:'"복귀 약속" 반드시 남기기', desc:'거리를 둘 때 파트너에게 언제 돌아올지 구체적으로 알려주세요. 침묵만 남기면 파트너는 계속 불안해집니다.', practice:'"2시간 후에 이야기하자"처럼 구체적인 시간 약속 남기기'},
+      {title:'매일 5분 "안부 대화" 루틴', desc:'큰 갈등을 피하기 위해서는 작은 연결이 중요합니다. 매일 짧게라도 서로의 하루를 나누는 습관이 추격 패턴을 줄여줘요.', practice:'저녁 식사 후 5분 "오늘 어땠어?" 루틴 만들기'},
+      {title:'작은 불편함도 그날 표현하기', desc:'회피하다 보면 불만이 쌓입니다. 작은 것부터 그날 표현하는 습관을 들이면 큰 갈등을 예방할 수 있어요.', practice:'"이거 좀 불편했어"를 오늘 안에 말하기'}
+    ],
+    'pursuer-pursuer': [
+      {title:'"쿨다운 타임" 규칙 만들기', desc:'둘 다 즉시 해결하려다 보면 감정이 과열됩니다. 갈등 시 15분씩 각자 진정하는 시간을 먼저 갖는 규칙을 만들어두세요.', practice:'갈등 시작 신호: "잠깐, 15분 후에 이야기하자"'},
+      {title:'한 명씩 말하기 규칙', desc:'둘 다 말하고 싶은 경향이 있어서 대화가 아닌 말싸움이 될 수 있습니다. 한 명이 다 말할 때까지 듣기 규칙을 미리 정해두세요.', practice:'"5분 타이머" 활용: 한 명이 5분 말하면, 상대가 5분 듣기'},
+      {title:'감정과 문제 해결 분리하기', desc:'감정이 올라온 상태에서는 문제 해결이 어렵습니다. 먼저 감정을 나누고, 해결은 그다음에 하는 순서를 약속해두세요.', practice:'"오늘은 감정만 나눠, 해결은 내일 하자" 규칙'}
+    ],
+    'distancer-distancer': [
+      {title:'"주간 관계 체크인" 루틴', desc:'둘 다 회피 성향이라 갈등이 수면 아래 쌓이기 쉽습니다. 매주 한 번 "요즘 불편한 거 있어?"라고 묻는 루틴을 만들어두세요.', practice:'매주 일요일 저녁, 15분 "관계 체크인" 대화'},
+      {title:'불편함 표현 약속', desc:'작은 불편함을 참다 보면 나중에 더 크게 폭발합니다. 아무리 작은 것이라도 그날 안에 표현하기로 약속해두세요.', practice:'"이거 좀 불편해"를 오늘 안에 말하기 챌린지'},
+      {title:'"적당한 거리"가 아닌 "연결된 독립" 추구하기', desc:'각자의 공간이 중요하지만, 연결감도 필요합니다. 함께하는 시간을 의도적으로 만들어가는 것이 두 회피형의 관계를 건강하게 유지해줍니다.', practice:'주 2회 "같은 공간에서 각자 하고 싶은 것 하기" 데이트'}
+    ],
+  };
+  const defaultRules = [
+    {title:'서로의 갈등 방식 이해하기', desc:'갈등이 생겼을 때 "나는 이런 사람이야"라고 미리 알려주세요. 상대의 반응이 나를 공격하는 게 아님을 이해하는 것이 첫 번째입니다.', practice:'갈등 전에 서로의 "갈등 설명서" 한 장씩 써주기'},
+    {title:'정기적인 대화 시간 만들기', desc:'바쁜 일상에서 관계를 의도적으로 돌보는 시간이 필요합니다. 정기적인 대화 루틴이 관계를 건강하게 유지해줍니다.', practice:'주 1회 "우리 대화 시간" 캘린더에 미리 잡아두기'},
+    {title:'작은 것부터 합의해 나가기', desc:'모든 것을 한 번에 결정하려 하면 압도됩니다. 오늘의 대화 카드에서 하나씩 이야기하며 합의점을 찾아가세요.', practice:'이번 주 대화 카드 1번부터 시작하기'}
+  ];
+  return RULE_TEMPLATES[taskKey] || defaultRules;
+}
+
+function animateRcBars() {
+  ['pA','pB','hA','hB','bA','bB','sA','sB'].forEach(id=>{
+    const bar = document.getElementById(id);
+    if(bar) bar.style.width = (bar.dataset.w||50)+'%';
+  });
+  document.querySelectorAll('.match-bar-v2').forEach(bar=>{
+    setTimeout(()=>{ bar.style.width=(bar.dataset.w||0)+'%'; }, 200);
+  });
+}
+
+function rcScrollTo(secId, tabEl) {
+  const el = document.getElementById(secId);
+  const scr = document.getElementById('s-rc');
+  if(!el||!scr) return;
+  scr.scrollTo({top: el.offsetTop-108, behavior:'smooth'});
+  document.querySelectorAll('#rc-tabs .rcstab').forEach(t=>t.classList.remove('on'));
+  if(tabEl) tabEl.classList.add('on');
+}
+
+function initRcScroll() {
+  const scr = document.getElementById('s-rc');
+  const secs = ['rcs-task','rcs-talk','rcs-phbs','rcs-vals','rcs-rules'];
+  const tabs = document.querySelectorAll('#rc-tabs .rcstab');
+  scr.addEventListener('scroll', function(){
+    let active=0;
+    const scrTop = scr.scrollTop+120;
+    secs.forEach((sid,i)=>{ const e=document.getElementById(sid); if(e&&e.offsetTop<=scrTop) active=i; });
+    tabs.forEach((t,i)=>t.classList.toggle('on', i===active));
+  }, {passive:true});
+}
+</script>
+</body>
+</html>
