@@ -785,19 +785,29 @@ html{height:-webkit-fill-available;}
 
   <!-- 💌 파트너 초대 (메인 CTA) -->
   <div id="rps-invite" class="rp-sec">
-    <div class="invite-hero-v2">
+    <!-- A 모드: 파트너 초대 -->
+    <div id="rps-invite-a-block" class="invite-hero-v2">
       <div class="invite-lock-v2">🔒</div>
       <div class="invite-title-v2">커플 MRI 잠금 해제하기</div>
       <div class="invite-desc-v2">파트너가 응답을 완료하면<br>두 사람만의 커플 MRI가 열립니다<br><br>기질 비교 · 가치관 일치율 · 대화 주제 3가지<br>결혼 전 꼭 확인해야 할 정보가 기다리고 있어요</div>
       <button class="invite-btn-v2" onclick="goScreen('s-invite')">💌 파트너에게 초대장 보내기</button>
     </div>
-    <div class="kakao-bubble invite-hero-v2" style="background:transparent;border:none;padding:0 0 0 0">
+    <div id="rps-invite-a-kakao" class="kakao-bubble invite-hero-v2" style="background:transparent;border:none;padding:0 0 0 0">
       <div class="rp-card" style="margin:12px 14px">
         <div class="rp-card-label">📱 카카오톡 예시 메시지</div>
         <div class="sample-msg-bubble">
           <p id="kakao-msg">"나 We+ 커플 MRI 해봤는데 너도 해봐~ 10분이면 돼 🧬 우리 얼마나 잘 맞는지 같이 확인해 보자! [링크]"</p>
         </div>
       </div>
+    </div>
+    <!-- B 모드: 커플 MRI 바로 보기 버튼 -->
+    <div id="rps-invite-b-block" style="display:none;padding:24px 16px;text-align:center">
+      <div style="font-size:40px;margin-bottom:12px">🔓</div>
+      <div style="font-size:18px;font-weight:700;color:#2c3e50;margin-bottom:8px">커플 MRI 잠금 해제!</div>
+      <div style="font-size:14px;color:#666;margin-bottom:20px;line-height:1.6">파트너의 응답이 준비됐어요.<br>지금 바로 두 사람의 커플 MRI를 확인하세요!</div>
+      <button class="invite-btn-v2" style="background:linear-gradient(135deg,#6c5ce7,#a29bfe)" onclick="showCoupleResultFromPersonal()">
+        💑 커플 MRI 결과 보기
+      </button>
     </div>
   </div>
   <div style="height:20px"></div>
@@ -865,7 +875,7 @@ html{height:-webkit-fill-available;}
 <div id="s-rc" class="scr">
   <!-- sticky topbar -->
   <div class="rc-top-bar">
-    <span style="font-size:20px;color:#666">←</span>
+    <span style="font-size:20px;color:#666;cursor:pointer" onclick="goScreen('s-rp')">←</span>
     <span class="rc-top-title">커플 MRI 결과</span>
     <span class="rc-unlock-badge">🔓 잠금 해제</span>
   </div>
@@ -1036,8 +1046,8 @@ html{height:-webkit-fill-available;}
       <button class="cta-talk-btn" onclick="rcScrollTo('rcs-talk',document.querySelector('#rc-tabs .rcstab:nth-child(2)'))">
         💬 대화 주제로 돌아가기
       </button>
-      <button class="cta-share-btn" id="c-share-btn" onclick="alert('커플 MRI 결과를 공유하세요! 우리 결혼 전 꼭 해봐! 🧬')">
-        📤 카카오톡으로 결과 공유하기
+      <button class="cta-share-btn" id="c-share-btn" onclick="shareCoupleResult()">
+        📤 결과 공유하기
       </button>
     </div>
     <div class="rc-card" style="margin-top:0">
@@ -1499,16 +1509,20 @@ async function calcAndShowPersonal() {
   myVals = Object.assign({}, vAns);
 
   if (isBMode) {
-    // B 모드: Supabase에 B 결과 저장 후 커플 MRI 바로 오픈
+    // B 모드: Supabase에 B 결과 저장 후 → 개인MRI 먼저 보여주고 → 커플MRI 버튼 제공
     await saveSessionB();
     setTimeout(()=>{
-      renderCoupleResult();
-      goScreen('s-proc2');
-      setTimeout(()=>{
-        goScreen('s-rc');
-        setTimeout(()=>{ animateRcBars(); initRcScroll(); }, 400);
-      }, 2200);
-    }, 100);
+      renderPersonal();
+      // B 모드 전용: 파트너 초대 섹션 숨기고, 커플MRI 바로보기 버튼 표시
+      const aBlock = document.getElementById('rps-invite-a-block');
+      const aKakao = document.getElementById('rps-invite-a-kakao');
+      const bBlock = document.getElementById('rps-invite-b-block');
+      if (aBlock) aBlock.style.display = 'none';
+      if (aKakao) aKakao.style.display = 'none';
+      if (bBlock) bBlock.style.display = 'block';
+      goScreen('s-rp');
+      setTimeout(()=>{ animateRpBars(); initRpScroll(); }, 400);
+    }, 2200);
   } else {
     // A 모드: Supabase에 A 결과 저장 후 개인 MRI 표시
     await saveSessionA();
@@ -1747,6 +1761,12 @@ function renderPersonal() {
   set('sc-b', `${bLabel} (${p.b}점)`);
   set('sc-s', `${sLabel} (${p.s}점)`);
 
+  // ── PHBS 바 너비 data-w 적용 (★ 이 코드가 없으면 bars 배열 pct가 무시됨)
+  bars.forEach(b => {
+    const el = document.getElementById(b.id);
+    if (el) el.dataset.w = b.pct;
+  });
+
   // 말풍선 텍스트
   const qPtxt = getPType(p)==='pursuer'?'갈등이 생기면 그날 안에 꼭 풀고 싶어집니다. 침묵이 오래되면 더 불안해져요.':
                getPType(p)==='distancer'?'갈등이 생기면 잠시 혼자 생각을 정리하고 싶어집니다.':
@@ -1855,6 +1875,35 @@ function showCoupleResult() {
     goScreen('s-rc');
     setTimeout(()=>{ animateRcBars(); initRcScroll(); }, 400);
   }, 1500);
+}
+
+// 커플 MRI 결과 공유하기
+function shareCoupleResult() {
+  const base = window.location.href.split('?')[0];
+  const myT = TYPE_MAP[getTypeKey(myPhbs)];
+  const ptT = TYPE_MAP[getTypeKey(partnerPhbs)];
+  const myName = myT ? myT.name : '?';
+  const ptName = ptT ? ptT.name : '?';
+  const msg = `💑 We+ 커플 MRI 완료!\n나: ${myName} / 파트너: ${ptName}\n결혼 전 꼭 해봐야 할 기질+가치관 검사 🧬\n${base}`;
+  const btn = document.getElementById('c-share-btn');
+  if (navigator.share) {
+    navigator.share({ title: 'We+ 커플 MRI 결과', text: msg, url: base })
+      .catch(() => {});
+  } else {
+    navigator.clipboard.writeText(msg).then(() => {
+      if (btn) { const orig = btn.textContent; btn.textContent = '✅ 복사됐어요! 카카오톡에 붙여넣으세요'; setTimeout(()=>{ btn.textContent = orig; }, 2500); }
+    }).catch(() => { prompt('아래 내용을 복사해서 공유하세요:', msg); });
+  }
+}
+
+// B 모드: 개인MRI 화면에서 커플MRI로 이동
+function showCoupleResultFromPersonal() {
+  goScreen('s-proc2');
+  setTimeout(()=>{
+    renderCoupleResult();
+    goScreen('s-rc');
+    setTimeout(()=>{ animateRcBars(); initRcScroll(); }, 400);
+  }, 2000);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2138,6 +2187,31 @@ function renderCoupleResult() {
         </div>
       </div>`).join('');
   }
+
+  // ── PHBS 4축 비교 바 data-w 설정 + 태그 텍스트 (★ 이 코드 없으면 bars 모두 50% 표시)
+  function phbsPct(phbs, axis) {
+    if (axis === 'p') { const n = phbs.pursue - phbs.avoid; return Math.max(8, Math.min(92, Math.round(((n+16)/32)*100))); }
+    if (axis === 'h') { return Math.max(8, Math.min(92, Math.round(((phbs.h-6)/24)*100))); }
+    if (axis === 'b') { return Math.max(8, Math.min(92, Math.round(((phbs.b-3)/12)*100))); }
+    if (axis === 's') { return Math.max(8, Math.min(92, Math.round(((phbs.s-3)/12)*100))); }
+  }
+  ['p','h','b','s'].forEach(ax => {
+    const elA = document.getElementById(ax+'A');
+    const elB = document.getElementById(ax+'B');
+    if (elA) elA.dataset.w = phbsPct(mp, ax);
+    if (elB) elB.dataset.w = phbsPct(pp, ax);
+  });
+  // 축 태그 텍스트 설정
+  const myPNet = mp.pursue - mp.avoid;
+  const ptPNet = pp.pursue - pp.avoid;
+  set('pa-tag', getPType(mp)==='pursuer'?`추격 (+${Math.abs(myPNet)})`:getPType(mp)==='distancer'?`회피 (${myPNet})`:'유연');
+  set('pb-tag', getPType(pp)==='pursuer'?`추격 (+${Math.abs(ptPNet)})`:getPType(pp)==='distancer'?`회피 (${ptPNet})`:'유연');
+  set('ha-tag', `${getHType(mp)==='hot'?'고온':getHType(mp)==='cool'?'저온':'중온'} (${mp.h}점)`);
+  set('hb-tag', `${getHType(pp)==='hot'?'고온':getHType(pp)==='cool'?'저온':'중온'} (${pp.h}점)`);
+  set('ba-tag', `${mp.b>=12?'결합':mp.b>=8?'균형':'독립'} (${mp.b}점)`);
+  set('bb-tag', `${pp.b>=12?'결합':pp.b>=8?'균형':'독립'} (${pp.b}점)`);
+  set('sa-tag', `${mp.s>=12?'불안':mp.s>=8?'보통':'안정'} (${mp.s}점)`);
+  set('sb-tag', `${pp.s>=12?'불안':pp.s>=8?'보통':'안정'} (${pp.s}점)`);
 
   // ── 숨겨진 보조 ID (JS 호환성 유지)
   set('c-insight-text', task.desc);
